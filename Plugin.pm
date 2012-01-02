@@ -5,7 +5,9 @@ package Plugins::SoundCloud::Plugin;
 # Released under GPLv2
 
 # TODO
-# figure out why spaces are getting translated to periods
+# debug playlist search offset
+# make playall work on playlists
+# fix titles
 # uri escape things
 # add optional user to title
 # can we show description?
@@ -155,11 +157,11 @@ sub toplevel {
     { name => string('PLUGIN_SOUNDCLOUD_TAGS'), type => 'search',   
 		  url  => \&tracksHandler, passthrough => [ { type => 'tags', params => 'order=hotness' } ], },
 
-    #{ name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_BROWSE'), type => 'link',
-		#  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
+    { name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_BROWSE'), type => 'link',
+		  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
 
-		#{ name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_SEARCH'), type => 'search',
-		#  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
+		{ name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_SEARCH'), type => 'search',
+		  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
 
 #		{ name => string('PLUGIN_YOUTUBE_RECENTLYPLAYED'), url  => \&recentHandler, },
 
@@ -190,10 +192,6 @@ sub urlHandler {
 					$log->warn($@);
 				}
 				
-        use Data::Dumper;
-        $log->warn(Dumper($json));
-        $log->warn($json->{'streamable'});
-
 # TODO: combine this with parseTrack
         $callback->({
           items => [ {
@@ -266,7 +264,7 @@ sub tracksHandler {
     $log->warn("i: " + $i);
 		my $max = min($quantity - scalar @$menu, 200); # api allows max of 200 items per response
     $log->warn("max: " + $max);
-		
+	
     # todo, formatting
     # todo, offset/limit/etc
     # TODO: make these params work
@@ -276,11 +274,15 @@ sub tracksHandler {
       my $id = $passDict->{'pid'} || '';
       if ($id eq '') {
         $resource = "playlists.json";
+        $quantity = 10;
       } else {
         $resource = "playlists/$id.json";
       }
+    } else {
+      $params .= "&filter=streamable";
     }
-		my $queryUrl = "http://api.soundcloud.com/$resource?client_id=$CLIENT_ID&offset=$i&limit=$quantity&filter=streamable&" . $params . "&" . $search;
+
+		my $queryUrl = "http://api.soundcloud.com/$resource?client_id=$CLIENT_ID&offset=$i&limit=$quantity&" . $params . "&" . $search;
 
 		$log->warn("fetching: $queryUrl");
 		
@@ -309,7 +311,7 @@ sub tracksHandler {
 					
 					$callback->({
 						items  => $menu,
-						offset => $index - 1,
+						offset => $index,
 						total  => $total,
 					});
 			},
@@ -335,7 +337,7 @@ sub addClientId {
 }
 
 sub _parseTracks {
-	my ($json, $menu) = @_;
+	my ($json, $menu, $playall) = @_;
   for my $entry (@$json) {
     if ($entry->{'streamable'}) {
       push @$menu, {
@@ -353,37 +355,23 @@ sub _parseTracks {
 
 sub _parsePlaylistTracks {
 	my ($json, $menu) = @_;
-  _parseTracks($json->{'tracks'}, $menu);
-}
-
-sub test1 {
-  $log->warn(Dumper(@_));
+  _parseTracks($json->{'tracks'}, $menu, 1);
 }
 
 sub _parsePlaylists {
 # TODO add duration here
 # TODO add # of tracks 
-
-  my $func = sub {
-  };
-
 	my ($json, $menu) = @_;
   for my $entry (@$json) {
     if ($entry->{'streamable'}) {
       $log->warn('putting in ' . $entry->{'id'});
       push @$menu, {
         name => $entry->{'title'},
-        type => 'playlist',
-        #url  => \&tracksHandler,
-        url => sub {
-          $log->warn("fuck me");
-          $log->warn(@_);
-        },
-
-        tracks => sub {
-          $log->warn("fuck me");
-          $log->warn(@_);
-        },
+        type => 'link',
+        url => \&tracksHandler,
+        tracks => \&tracksHandler,
+        playlist => \&tracksHandler,
+        # playall => 1,
         passthrough => [ { type => 'playlists', pid => $entry->{'id'}, parser => \&_parsePlaylistTracks }],
       };
       $log->warn(Dumper($menu));
