@@ -5,11 +5,12 @@ package Plugins::SoundCloud::Plugin;
 # Released under GPLv2
 
 # TODO
-# get url working
+# figure out why spaces are getting translated to periods
+# uri escape things
 # add optional user to title
 # can we show description?
-# get papgination working
-# get search working
+# is there pagination for /tracks
+# get search working -- tags, query
 # get accounts working <-- long way off
 
 use strict;
@@ -25,6 +26,8 @@ use Slim::Utils::Strings qw(string);
 use Slim::Utils::Prefs;
 use Slim::Utils::Log;
 
+use Data::Dumper;
+
 use Plugins::SoundCloud::ProtocolHandler;
 
 my $log;
@@ -34,7 +37,7 @@ my $CLIENT_ID = "ff21e0d51f1ea3baf9607a1d072c564f";
 BEGIN {
 	$log = Slim::Utils::Log->addLogCategory({
 		'category'     => 'plugin.youtube',
-		'defaultLevel' => 'WARN',
+		'defaultLevel' => 'INFO',
 		'description'  => string('PLUGIN_SOUNDCLOUD'),
 	}); 
 
@@ -143,10 +146,13 @@ sub toplevel {
 
 	$callback->([
 		{ name => string('PLUGIN_SOUNDCLOUD_HOT'), type => 'link',   
-		  url  => \&tracksHandler, passthrough => [ 'order=hotness' ], },
+		  url  => \&tracksHandler, passthrough => [ { params => 'order=hotness' } ], },
 
     { name => string('PLUGIN_SOUNDCLOUD_NEW'), type => 'link',   
-		  url  => \&tracksHandler, passthrough => [ 'order=created_at' ], },
+		  url  => \&tracksHandler, passthrough => [ { params => 'order=created_at' } ], },
+
+    { name => string('PLUGIN_SOUNDCLOUD_SEARCH'), type => 'search',   
+		  url  => \&tracksHandler, passthrough => [ { params => 'order=hotness' } ], },
 
 #		{ name => string('PLUGIN_YOUTUBE_PLAYLISTSEARCH'), type => 'search',
 #		  url  => \&searchHandler, passthrough => [ 'playlists/snippets', \&_parsePlaylists ] },
@@ -166,6 +172,7 @@ sub urlHandler {
   $url =~ s/www /www./;
 
   $log->warn($args->{'search'});
+  # TODO: url escape this
   my $queryUrl = "http://api.soundcloud.com/resolve.json?url=$url&client_id=$CLIENT_ID";
   $log->warn($queryUrl);
 
@@ -236,12 +243,20 @@ sub recentHandler {
 }
 
 sub tracksHandler {
-	my ($client, $callback, $args, $params) = @_;
+	my ($client, $callback, $args, $passDict) = @_;
 
 	# use paging on interfaces which allow otherwise fetch 200 entries for button mode
-	my $index    = ($args->{'index'} || 0) + 1;
+	my $index    = ($args->{'index'} || 0); # ie, offset
 	my $quantity = $args->{'quantity'} || 200;
 	my $search   = $args->{'search'} ? "q=$args->{search}" : '';
+
+  $log->warn(Dumper($passDict));
+
+  my $params = $passDict->{'params'} || '';
+  $log->warn($params);
+
+  $log->warn("index: " . $index);
+  $log->warn("quantity: " . $quantity);
 	
 	my $menu = [];
 	
@@ -251,15 +266,18 @@ sub tracksHandler {
 	# FIXME: this could be sped up by performing parallel requests once the number of responses is known??
 
 	$fetch = sub {
-		
+    # in case we've already fetched some of this page, keep going
 		my $i = $index + scalar @$menu;
-		my $max = min($quantity - scalar @$menu, 50); # api allows max of 50 items per response
+    $log->warn("i: " + $i);
+		my $max = min($quantity - scalar @$menu, 200); # api allows max of 200 items per response
+    $log->warn("max: " + $max);
 		
     # todo, formatting
     # todo, offset/limit/etc
-		my $queryUrl = "http://api.soundcloud.com/tracks.json?client_id=$CLIENT_ID&limit=10&filter=streamable&" . $params;
+    # TODO: make these params work
+		my $queryUrl = "http://api.soundcloud.com/tracks.json?client_id=$CLIENT_ID&offset=$i&limit=$quantity&filter=streamable&" . $params . "&" . $search;
 
-		$log->info("fetching: $queryUrl");
+		$log->warn("fetching: $queryUrl");
 		
 		Slim::Networking::SimpleAsyncHTTP->new(
 			
@@ -271,8 +289,6 @@ sub tracksHandler {
 					$log->warn($@);
 				}
 				
-				my $before = scalar @$menu;
-
       for my $entry (@$json) {
           if ($entry->{'streamable'}) {
             push @$menu, {
@@ -286,26 +302,23 @@ sub tracksHandler {
             };
           }
         }
-
-				# Restrict responses to requested searchmax or 500
-				# Youtube API appears to be limited to 1000, but does not always return 1000 results so restrict to 500
-				my $total = 10;
+  
+        # max offset = 8000, max index = 200 sez soundcloud http://developers.soundcloud.com/docs#pagination
+        my $total = 8000 + $quantity;
 				
 				$log->debug("this page: " . scalar @$menu . " total: $total");
 
-				#if (scalar @$menu < $quantity && $total > $index + scalar @$menu && scalar @$menu > $before) {
+        # TODO: check this logic makes sense
+				if (scalar @$menu < $quantity) {
+          $total = $index + @$menu;
+          $log->debug("short page, truncate total to $total");
+        }
 					
-					# get some more if we have yet to build the required page for client
-				#	$fetch->();
-					
-				#} else {
-
 					$callback->({
 						items  => $menu,
 						offset => $index - 1,
 						total  => $total,
 					});
-				#}
 			},
 			
 			sub {
