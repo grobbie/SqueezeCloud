@@ -28,8 +28,6 @@ use Slim::Utils::Log;
 
 use Data::Dumper;
 
-use Plugins::SoundCloud::ProtocolHandler;
-
 my $log;
 my $compat;
 my $CLIENT_ID = "ff21e0d51f1ea3baf9607a1d072c564f";
@@ -429,48 +427,6 @@ sub artistInfoMenu {
 	} else {
 		return {};
 	}
-}
-
-sub webVideoLink {
-	my ($client, $url) = @_;
-
-	if (my $id = Plugins::SoundCloud::ProtocolHandler->_id($url)) {
-
-		my $show;
-		my $i = 0;
-		while (my $caller = (caller($i++))[3]) {
-			if ($caller =~ /Slim::Web::Pages/) {
-				$show = 1;
-				last;
-			}
-			if ($caller =~ /cliQuery/) {
-				if ($client->can('controllerUA') && $client->controllerUA =~ /iPeng/) {
-					$show = 1;
-				}
-				last;
-			}
-		}
-
-		if ($show) {
-			return {
-				type    => 'text',
-				name    => string('PLUGIN_YOUTUBE_WEBLINK'),
-				weblink => "http://www.youtube.com/watch?v=$id",
-				jive => {
-					actions => {
-						go => {
-							cmd => [ 'youtube', 'info' ],
-							params => {
-								id => $id,
-							},
-						},
-					},
-				},
-			};
-		}
-	}
-
-	return undef;
 }
 
 sub searchInfoMenu {
