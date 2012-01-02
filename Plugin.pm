@@ -369,9 +369,7 @@ sub _parsePlaylists {
         name => $entry->{'title'},
         type => 'link',
         url => \&tracksHandler,
-        tracks => \&tracksHandler,
-        playlist => \&tracksHandler,
-        # playall => 1,
+        playall => 1,
         passthrough => [ { type => 'playlists', pid => $entry->{'id'}, parser => \&_parsePlaylistTracks }],
       };
       $log->warn(Dumper($menu));
