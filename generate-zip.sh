@@ -20,7 +20,7 @@ cat <<EOF > public.xml
 <sha>$SHA</sha>
 <link></link>
 <creator>David Blackman</creator>
-<email>squeezecloud@whizziwig.com</email>
+<email>david+squeezecloud@whizziwig.com</email>
 </plugin>
 </plugins>
 </extensions>
