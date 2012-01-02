@@ -34,7 +34,7 @@ my $CLIENT_ID = "ff21e0d51f1ea3baf9607a1d072c564f";
 
 BEGIN {
 	$log = Slim::Utils::Log->addLogCategory({
-		'category'     => 'plugin.youtube',
+		'category'     => 'plugin.soundcloud',
 		'defaultLevel' => 'INFO',
 		'description'  => string('PLUGIN_SOUNDCLOUD'),
 	}); 
@@ -52,7 +52,7 @@ BEGIN {
 	}
 }
 
-my $prefs = preferences('plugin.youtube');
+my $prefs = preferences('plugin.soundcloud');
 
 $prefs->init({ prefer_lowbitrate => 0, recent => [] });
 
@@ -63,32 +63,32 @@ sub initPlugin {
 
 	$class->SUPER::initPlugin(
 		feed   => \&toplevel,
-		tag    => 'youtube',
+		tag    => 'soundcloud',
 		menu   => 'radios',
 		is_app => $class->can('nonSNApps') ? 1 : undef,
 		weight => 10,
 	);
 
-	Slim::Menu::TrackInfo->registerInfoProvider( youtube => (
-		after => 'middle',
-		func  => \&trackInfoMenu,
-	) );
-
-	Slim::Menu::TrackInfo->registerInfoProvider( youtubevideo => (
-		after => 'bottom',
-		func  => \&webVideoLink,
-	) );
-
-	Slim::Menu::ArtistInfo->registerInfoProvider( youtube => (
-		after => 'middle',
-		func  => \&artistInfoMenu,
-	) );
-
-	Slim::Menu::GlobalSearch->registerInfoProvider( youtube => (
-		after => 'middle',
-		name  => 'PLUGIN_SOUNDCLOUD',
-		func  => \&searchInfoMenu,
-	) );
+#	Slim::Menu::TrackInfo->registerInfoProvider( youtube => (
+#		after => 'middle',
+#		func  => \&trackInfoMenu,
+#	) );
+#
+#	Slim::Menu::TrackInfo->registerInfoProvider( youtubevideo => (
+#		after => 'bottom',
+#		func  => \&webVideoLink,
+#	) );
+#
+#	Slim::Menu::ArtistInfo->registerInfoProvider( youtube => (
+#		after => 'middle',
+#		func  => \&artistInfoMenu,
+#	) );
+#
+#	Slim::Menu::GlobalSearch->registerInfoProvider( youtube => (
+#		after => 'middle',
+#		name  => 'PLUGIN_SOUNDCLOUD',
+#		func  => \&searchInfoMenu,
+#	) );
 
 	if (!$::noweb) {
 		require Plugins::SoundCloud::Settings;
@@ -99,7 +99,7 @@ sub initPlugin {
 		$recentlyPlayed{ $recent->{'url'} } = $recent;
 	}
 
-	Slim::Control::Request::addDispatch(['youtube', 'info'], [1, 1, 1, \&cliInfoQuery]);
+	#Slim::Control::Request::addDispatch(['youtube', 'info'], [1, 1, 1, \&cliInfoQuery]);
 }
 
 sub shutdownPlugin {
@@ -155,7 +155,6 @@ sub toplevel {
     { name => string('PLUGIN_SOUNDCLOUD_TAGS'), type => 'search',   
 		  url  => \&tracksHandler, passthrough => [ { type => 'tags', params => 'order=hotness' } ], },
 
-
 #		{ name => string('PLUGIN_YOUTUBE_PLAYLISTSEARCH'), type => 'search',
 #		  url  => \&searchHandler, passthrough => [ 'playlists/snippets', \&_parsePlaylists ] },
 
@@ -191,12 +190,14 @@ sub urlHandler {
         use Data::Dumper;
         $log->warn(Dumper($json));
         $log->warn($json->{'streamable'});
+
+# TODO: combine this with parseTrack
         $callback->({
           items => [ {
             name => $json->{'title'},
             type => 'audio',
             url  => $json->{'permalink_url'},
-            play => $json->{'stream_url'} . "?client_id=$CLIENT_ID",
+            play => addClientId($json->{'stream_url'}),
             icon => $json->{'artwork_url'} || "",
             cover => $json->{'artwork_url'} || "",
           } ]
@@ -210,21 +211,6 @@ sub urlHandler {
 	};
 		
 	$fetch->();
-
-
-#				$callback->({
-#					items => [ {
-#						name => $meta->{'title'},
-#						url  => $url,
-#						type => 'audio',
-#						icon => $meta->{'icon'},
-#						cover=> $meta->{'cover'},
-#					} ]
-#				});
-#			} else {
-#				$callback->([ { name => string('PLUGIN_YOUTUBE_BADURL'), type => 'text' } ]);
-#			}
-#		}
 }
 
 sub recentHandler {
@@ -250,11 +236,13 @@ sub tracksHandler {
 	# use paging on interfaces which allow otherwise fetch 200 entries for button mode
 	my $index    = ($args->{'index'} || 0); # ie, offset
 	my $quantity = $args->{'quantity'} || 200;
-  my $searchStr = ($passDict->{'type'} eq 'tags') ? "tags=$args->{search}" : "q=$args->{search}";
+  my $searchType = $passDict->{'type'};
+  my $searchStr = ($searchType eq 'tags') ? "tags=$args->{search}" : "q=$args->{search}";
 	my $search   = $args->{'search'} ? $searchStr : '';
 
   $log->warn(Dumper($passDict));
 
+  my $parser = $passDict->{'parser'} || \&_parseTracks;
   my $params = $passDict->{'params'} || '';
   $log->warn($params);
 
@@ -278,6 +266,10 @@ sub tracksHandler {
     # todo, formatting
     # todo, offset/limit/etc
     # TODO: make these params work
+    my $resource = "tracks.json";
+    if ($searchType eq 'playlists') {
+      $resource = "playlists.json";
+    }
 		my $queryUrl = "http://api.soundcloud.com/tracks.json?client_id=$CLIENT_ID&offset=$i&limit=$quantity&filter=streamable&" . $params . "&" . $search;
 
 		$log->warn("fetching: $queryUrl");
@@ -291,20 +283,8 @@ sub tracksHandler {
 				if ($@) {
 					$log->warn($@);
 				}
-				
-      for my $entry (@$json) {
-          if ($entry->{'streamable'}) {
-            push @$menu, {
-              name => $entry->{'title'},
-              type => 'audio',
-              on_select => 'play',
-              playall => 0,
-              url  => $entry->{'permalink_url'},
-              play => $entry->{'stream_url'} . "?client_id=$CLIENT_ID",
-              icon => $entry->{'artwork_url'} || "",
-            };
-          }
-        }
+
+        $parser->($json, $menu); 
   
         # max offset = 8000, max index = 200 sez soundcloud http://developers.soundcloud.com/docs#pagination
         my $total = 8000 + $quantity;
@@ -335,48 +315,31 @@ sub tracksHandler {
 	$fetch->();
 }
 
-sub _parseVideos {
-	my ($json, $menu) = @_;
-	for my $entry (@{$json->{'entry'} || []}) {
-		my $mg = $entry->{'media$group'};
-		push @$menu, {
-			name => $mg->{'media$title'}->{'$t'},
-			type => 'audio',
-			on_select => 'play',
-			playall => 0,
-			url  => 'youtube://' . $mg->{'yt$videoid'}->{'$t'},
-			play => 'youtube://' . $mg->{'yt$videoid'}->{'$t'},
-			icon => $mg->{'media$thumbnail'}->[0]->{'url'},
-		};
-	}
+sub addClientId {
+  my ($url) = shift;
+  if ($url =~ /\?/) {
+    return $url . "&client_id=$CLIENT_ID";
+  } else {
+    return $url . "?client_id=$CLIENT_ID";
+  }
 }
 
-sub _parseChannels {
-	my ($json, $menu) = @_;
-	for my $entry (@{$json->{'entry'} || []}) {
-		my $title = $entry->{'title'}->{'$t'} || $entry->{'summary'}->{'$t'} || 'No Title';
-		$title = Slim::Formats::XML::unescapeAndTrim($title);
-		push @$menu, {
-			name => $title,
-			type => 'link',
-			url  => \&searchHandler,
-			passthrough => [ $entry->{'gd$feedLink'}->[0]->{'href'}, \&_parseVideos ],
-		};
-	}
-}
 
-sub _parsePlaylists {
+sub _parseTracks {
 	my ($json, $menu) = @_;
-	for my $entry (@{$json->{'entry'} || []}) {
-		my $title = $entry->{'title'}->{'$t'} || $entry->{'summary'}->{'$t'} || 'No Title';
-		$title = Slim::Formats::XML::unescapeAndTrim($title);
-		push @$menu, {
-			name => $title,
-			type => 'link',
-			url  => \&searchHandler,
-			passthrough => [ $entry->{'content'}->{'src'}, \&_parseVideos ],
-		};
-	}
+  for my $entry (@$json) {
+    if ($entry->{'streamable'}) {
+      push @$menu, {
+        name => $entry->{'title'},
+        type => 'audio',
+        on_select => 'play',
+        playall => 0,
+        url  => $entry->{'permalink_url'},
+        play => addClientId($entry->{'stream_url'}),
+        icon => $entry->{'artwork_url'} || "",
+      };
+    }
+  }
 }
 
 sub trackInfoMenu {
