@@ -154,6 +154,10 @@ sub toplevel {
     { name => string('PLUGIN_SOUNDCLOUD_SEARCH'), type => 'search',   
 		  url  => \&tracksHandler, passthrough => [ { params => 'order=hotness' } ], },
 
+    { name => string('PLUGIN_SOUNDCLOUD_TAGS'), type => 'search',   
+		  url  => \&tracksHandler, passthrough => [ { type => 'tags', params => 'order=hotness' } ], },
+
+
 #		{ name => string('PLUGIN_YOUTUBE_PLAYLISTSEARCH'), type => 'search',
 #		  url  => \&searchHandler, passthrough => [ 'playlists/snippets', \&_parsePlaylists ] },
 
@@ -248,7 +252,8 @@ sub tracksHandler {
 	# use paging on interfaces which allow otherwise fetch 200 entries for button mode
 	my $index    = ($args->{'index'} || 0); # ie, offset
 	my $quantity = $args->{'quantity'} || 200;
-	my $search   = $args->{'search'} ? "q=$args->{search}" : '';
+  my $searchStr = ($passDict->{'type'} eq 'tags') ? "tags=$args->{search}" : "q=$args->{search}";
+	my $search   = $args->{'search'} ? $searchStr : '';
 
   $log->warn(Dumper($passDict));
 
@@ -306,7 +311,7 @@ sub tracksHandler {
         # max offset = 8000, max index = 200 sez soundcloud http://developers.soundcloud.com/docs#pagination
         my $total = 8000 + $quantity;
 				
-				$log->debug("this page: " . scalar @$menu . " total: $total");
+				$log->info("this page: " . scalar @$menu . " total: $total");
 
         # TODO: check this logic makes sense
 				if (scalar @$menu < $quantity) {
