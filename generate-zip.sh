@@ -16,9 +16,9 @@ cat <<EOF > public.xml
 <plugin name="SoundCloud" version="$VERSION" minTarget="7.5" maxTarget="*">
 <title lang="EN">SoundCloud</title>
 <desc lang="EN">Browse, search and play urls from soundcloud</desc>
-<url>https://github.com/blackmad/squeezecloud</url>
+<url>http://whizziwig.com/static/squeezecloud/SoundCloud.zip</url>
+<link>https://github.com/blackmad/squeezecloud</link>
 <sha>$SHA</sha>
-<link></link>
 <creator>David Blackman</creator>
 <email>david+squeezecloud@whizziwig.com</email>
 </plugin>
