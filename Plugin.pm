@@ -155,8 +155,11 @@ sub toplevel {
     { name => string('PLUGIN_SOUNDCLOUD_TAGS'), type => 'search',   
 		  url  => \&tracksHandler, passthrough => [ { type => 'tags', params => 'order=hotness' } ], },
 
-#		{ name => string('PLUGIN_YOUTUBE_PLAYLISTSEARCH'), type => 'search',
-#		  url  => \&searchHandler, passthrough => [ 'playlists/snippets', \&_parsePlaylists ] },
+    #{ name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_BROWSE'), type => 'link',
+		#  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
+
+		#{ name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_SEARCH'), type => 'search',
+		#  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
 
 #		{ name => string('PLUGIN_YOUTUBE_RECENTLYPLAYED'), url  => \&recentHandler, },
 
@@ -232,8 +235,8 @@ sub recentHandler {
 
 sub tracksHandler {
 	my ($client, $callback, $args, $passDict) = @_;
+  $log->warn(Dumper(@_));
 
-	# use paging on interfaces which allow otherwise fetch 200 entries for button mode
 	my $index    = ($args->{'index'} || 0); # ie, offset
 	my $quantity = $args->{'quantity'} || 200;
   my $searchType = $passDict->{'type'};
@@ -246,6 +249,7 @@ sub tracksHandler {
   my $params = $passDict->{'params'} || '';
   $log->warn($params);
 
+  $log->warn('search type: ' . $searchType);
   $log->warn("index: " . $index);
   $log->warn("quantity: " . $quantity);
 	
@@ -268,9 +272,15 @@ sub tracksHandler {
     # TODO: make these params work
     my $resource = "tracks.json";
     if ($searchType eq 'playlists') {
-      $resource = "playlists.json";
+      $log->warn("id? " .$passDict->{'pid'});
+      my $id = $passDict->{'pid'} || '';
+      if ($id eq '') {
+        $resource = "playlists.json";
+      } else {
+        $resource = "playlists/$id.json";
+      }
     }
-		my $queryUrl = "http://api.soundcloud.com/tracks.json?client_id=$CLIENT_ID&offset=$i&limit=$quantity&filter=streamable&" . $params . "&" . $search;
+		my $queryUrl = "http://api.soundcloud.com/$resource?client_id=$CLIENT_ID&offset=$i&limit=$quantity&filter=streamable&" . $params . "&" . $search;
 
 		$log->warn("fetching: $queryUrl");
 		
@@ -324,7 +334,6 @@ sub addClientId {
   }
 }
 
-
 sub _parseTracks {
 	my ($json, $menu) = @_;
   for my $entry (@$json) {
@@ -341,6 +350,47 @@ sub _parseTracks {
     }
   }
 }
+
+sub _parsePlaylistTracks {
+	my ($json, $menu) = @_;
+  _parseTracks($json->{'tracks'}, $menu);
+}
+
+sub test1 {
+  $log->warn(Dumper(@_));
+}
+
+sub _parsePlaylists {
+# TODO add duration here
+# TODO add # of tracks 
+
+  my $func = sub {
+  };
+
+	my ($json, $menu) = @_;
+  for my $entry (@$json) {
+    if ($entry->{'streamable'}) {
+      $log->warn('putting in ' . $entry->{'id'});
+      push @$menu, {
+        name => $entry->{'title'},
+        type => 'playlist',
+        #url  => \&tracksHandler,
+        url => sub {
+          $log->warn("fuck me");
+          $log->warn(@_);
+        },
+
+        tracks => sub {
+          $log->warn("fuck me");
+          $log->warn(@_);
+        },
+        passthrough => [ { type => 'playlists', pid => $entry->{'id'}, parser => \&_parsePlaylistTracks }],
+      };
+      $log->warn(Dumper($menu));
+    }
+  }
+}
+
 
 sub trackInfoMenu {
 	my ($client, $url, $track, $remoteMeta) = @_;
