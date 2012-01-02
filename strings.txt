@@ -1,14 +1,20 @@
-PLUGIN_YOUTUBE
+PLUGIN_SOUNDCLOUD
 	EN	SoundCloud
 
-YOUTUBE
+SOUNDCLOUD
 	EN	SoundCloud
 
-PLUGIN_YOUTUBE_DESC
+PLUGIN_SOUNDCLOUD_DESC
 	EN	Play audio from YouTube videos.  WARNING: this plugin will use more network bandwidth than other streaming services as the entire video is being streamed even though only the audio is played.
 
-PLUGIN_YOUTUBE_TOP
-	EN	Top Rated Music
+PLUGIN_SOUNDCLOUD_HOT
+	EN	Hottest Tracks
+
+PLUGIN_SOUNDCLOUD_NEW
+	EN	Newest Tracks
+
+PLUGIN_SOUNDCLOUD_URL
+	EN	SoundCloud URL
 
 PLUGIN_YOUTUBE_POP
 	EN	Most Popular Music
@@ -33,9 +39,6 @@ PLUGIN_YOUTUBE_PLAYLISTSEARCH
 
 PLUGIN_YOUTUBE_RECENTLYPLAYED
 	EN	Recently Played
-
-PLUGIN_YOUTUBE_URL
-	EN	YouTube URL
 
 PLUGIN_YOUTUBE_BADURL
 	EN	Bad YouTube URL

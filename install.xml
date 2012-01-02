@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
 
 <extension>
-	<name>PLUGIN_YOUTUBE</name>
+	<name>PLUGIN_SOUNDCLOUD</name>
 	<module>Plugins::SoundCloud::Plugin</module>
 	<version>1.13</version>
-	<description>PLUGIN_YOUTUBE_DESC</description>
-	<icon>http://www.youtube.com/img/pic_youtubelogo_123x63.gif</icon>
+	<description>PLUGIN_SOUNDCLOUD_DESC</description>
+	<icon>plugins/SoundCloud/icon.png</icon>
 	<defaultState>enabled</defaultState>
 	<targetApplication>
 		<id>SlimServer</id>

@@ -6,7 +6,7 @@ use base qw(Slim::Web::Settings);
 use Slim::Utils::Prefs;
 
 sub name {
-	return 'PLUGIN_YOUTUBE';
+	return 'PLUGIN_SOUNDCLOUD';
 }
 
 sub page {

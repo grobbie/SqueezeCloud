@@ -1,8 +1,16 @@
 package Plugins::SoundCloud::Plugin;
 
-# Plugin to stream audio from YouTube videos streams
+# Plugin to stream audio from SoundCloud streams
 #
 # Released under GPLv2
+
+# TODO
+# get url working
+# add optional user to title
+# can we show description?
+# get papgination working
+# get search working
+# get accounts working <-- long way off
 
 use strict;
 
@@ -21,12 +29,13 @@ use Plugins::SoundCloud::ProtocolHandler;
 
 my $log;
 my $compat;
+my $CLIENT_ID = "ff21e0d51f1ea3baf9607a1d072c564f";
 
 BEGIN {
 	$log = Slim::Utils::Log->addLogCategory({
 		'category'     => 'plugin.youtube',
 		'defaultLevel' => 'WARN',
-		'description'  => string('PLUGIN_YOUTUBE'),
+		'description'  => string('PLUGIN_SOUNDCLOUD'),
 	}); 
 
 	# Always use OneBrowser version of XMLBrowser by using server or packaged version included with plugin
@@ -76,7 +85,7 @@ sub initPlugin {
 
 	Slim::Menu::GlobalSearch->registerInfoProvider( youtube => (
 		after => 'middle',
-		name  => 'PLUGIN_YOUTUBE',
+		name  => 'PLUGIN_SOUNDCLOUD',
 		func  => \&searchInfoMenu,
 	) );
 
@@ -98,7 +107,7 @@ sub shutdownPlugin {
 	$class->saveRecentlyPlayed('now');
 }
 
-sub getDisplayName { 'PLUGIN_YOUTUBE' }
+sub getDisplayName { 'PLUGIN_SOUNDCLOUD' }
 
 sub playerMenu { shift->can('nonSNApps') ? undef : 'RADIO' }
 
@@ -133,62 +142,80 @@ sub toplevel {
 	my ($client, $callback, $args) = @_;
 
 	$callback->([
-		{ name => string('PLUGIN_YOUTUBE_TOP'), type => 'link',   
-		  url  => \&testHandler, passthrough => [ ], },
+		{ name => string('PLUGIN_SOUNDCLOUD_HOT'), type => 'link',   
+		  url  => \&tracksHandler, passthrough => [ 'order=hotness' ], },
 
-		{ name => string('PLUGIN_YOUTUBE_POP'), type => 'link',
-		  url  => \&searchHandler, passthrough => [ 'standardfeeds/most_popular_Music', \&_parseVideos ], },
+    { name => string('PLUGIN_SOUNDCLOUD_NEW'), type => 'link',   
+		  url  => \&tracksHandler, passthrough => [ 'order=created_at' ], },
 
-		#{ name => string('PLUGIN_YOUTUBE_RECENT'), type => 'link', 
-		#  url  => \&searchHandler,	passthrough => [ 'standardfeeds/most_recent_Music', \&_parseVideos ], },
+#		{ name => string('PLUGIN_YOUTUBE_PLAYLISTSEARCH'), type => 'search',
+#		  url  => \&searchHandler, passthrough => [ 'playlists/snippets', \&_parsePlaylists ] },
 
-		{ name => string('PLUGIN_YOUTUBE_FAV'),  type => 'link',
-		  url  => \&searchHandler,	passthrough => [ 'standardfeeds/top_favorites_Music', \&_parseVideos ], },
+#		{ name => string('PLUGIN_YOUTUBE_RECENTLYPLAYED'), url  => \&recentHandler, },
 
-		{ name => string('PLUGIN_YOUTUBE_SEARCH'),  type => 'search',
-		  url  => \&searchHandler, passthrough => [ 'videos', \&_parseVideos ] },
-
-		{ name => string('PLUGIN_YOUTUBE_MUSICSEARCH'), type => 'search',
-		  url  => \&searchHandler, passthrough => [ 'videos', \&_parseVideos, 'category=music' ] },
-
-		{ name => string('PLUGIN_YOUTUBE_CHANNELSEARCH'), type => 'search',
-		  url  => \&searchHandler, passthrough => [ 'channels', \&_parseChannels ] },
-
-		{ name => string('PLUGIN_YOUTUBE_PLAYLISTSEARCH'), type => 'search',
-		  url  => \&searchHandler, passthrough => [ 'playlists/snippets', \&_parsePlaylists ] },
-
-		{ name => string('PLUGIN_YOUTUBE_RECENTLYPLAYED'), url  => \&recentHandler, },
-
-		{ name => string('PLUGIN_YOUTUBE_URL'), type => 'search', url  => \&urlHandler, },
+		{ name => string('PLUGIN_SOUNDCLOUD_URL'), type => 'search', url  => \&urlHandler, },
 	]);
 }
 
 sub urlHandler {
 	my ($client, $callback, $args) = @_;
 
-	my $url = 'youtube://' . $args->{'search'};
+	my $url = $args->{'search'};
+# awful hacks, why are periods being replaced?
+  $url =~ s/ com/.com/;
+  $url =~ s/www /www./;
 
-	# use metadata handler to get track info
-	Plugins::SoundCloud::ProtocolHandler->getMetadataFor(undef, $url, undef, undef, 
-		sub {
-			my $meta = shift;
-			if (keys %$meta) {
-				$callback->({
-					items => [ {
-						name => $meta->{'title'},
-						url  => $url,
-						type => 'audio',
-						icon => $meta->{'icon'},
-						cover=> $meta->{'cover'},
-					} ]
-				});
-			} else {
-				$callback->([ { name => string('PLUGIN_YOUTUBE_BADURL'), type => 'text' } ]);
-			}
-		}
-	) && do {
-		$callback->([ { name => string('PLUGIN_YOUTUBE_BADURL'), type => 'text' } ]);
+  $log->warn($args->{'search'});
+  my $queryUrl = "http://api.soundcloud.com/resolve.json?url=$url&client_id=$CLIENT_ID";
+  $log->warn($queryUrl);
+
+  my $fetch = sub {
+		Slim::Networking::SimpleAsyncHTTP->new(
+			sub {
+				my $http = shift;
+				my $json = eval { from_json($http->content) };
+				
+				if ($@) {
+					$log->warn($@);
+				}
+				
+        use Data::Dumper;
+        $log->warn(Dumper($json));
+        $log->warn($json->{'streamable'});
+        $callback->({
+          items => [ {
+            name => $json->{'title'},
+            type => 'audio',
+            url  => $json->{'permalink_url'},
+            play => $json->{'stream_url'} . "?client_id=$CLIENT_ID",
+            icon => $json->{'artwork_url'} || "",
+            cover => $json->{'artwork_url'} || "",
+          } ]
+        })
+			},
+			sub {
+				$log->warn("error: $_[1]");
+				$callback->([ { name => $_[1], type => 'text' } ]);
+			},
+		)->get($queryUrl);
 	};
+		
+	$fetch->();
+
+
+#				$callback->({
+#					items => [ {
+#						name => $meta->{'title'},
+#						url  => $url,
+#						type => 'audio',
+#						icon => $meta->{'icon'},
+#						cover=> $meta->{'cover'},
+#					} ]
+#				});
+#			} else {
+#				$callback->([ { name => string('PLUGIN_YOUTUBE_BADURL'), type => 'text' } ]);
+#			}
+#		}
 }
 
 sub recentHandler {
@@ -208,92 +235,13 @@ sub recentHandler {
 	$callback->({ items => \@menu });
 }
 
-sub searchHandler {
-	my ($client, $callback, $args, $feed, $parser, $term) = @_;
+sub tracksHandler {
+	my ($client, $callback, $args, $params) = @_;
 
 	# use paging on interfaces which allow otherwise fetch 200 entries for button mode
 	my $index    = ($args->{'index'} || 0) + 1;
 	my $quantity = $args->{'quantity'} || 200;
 	my $search   = $args->{'search'} ? "q=$args->{search}" : '';
-	$term ||= '';
-	
-	my $menu = [];
-	
-	# fetch in stages as api only allows 50 items per response, cli clients require $quantity responses which can be more than 50
-	my $fetch;
-	
-	# FIXME: this could be sped up by performing parallel requests once the number of responses is known??
-
-	$fetch = sub {
-		
-		my $i = $index + scalar @$menu;
-		my $max = min($quantity - scalar @$menu, 50); # api allows max of 50 items per response
-		
-		my $queryUrl;
-
-		if ($feed =~ /^http/) {
-			$queryUrl = "$feed&start-index=$i&max-results=$max&v=2&alt=json";
-		} else {
-			$queryUrl = "http://gdata.youtube.com/feeds/api/$feed?$term&$search&start-index=$i&max-results=$max&v=2&alt=json";
-		}
-
-		$log->info("fetching: $queryUrl");
-		
-		Slim::Networking::SimpleAsyncHTTP->new(
-			
-			sub {
-				my $http = shift;
-				my $json = eval { from_json($http->content) };
-				
-				if ($@) {
-					$log->warn($@);
-				}
-				
-				my $before = scalar @$menu;
-
-				# parse json response into menu entries
-				$parser->($json->{'feed'}, $menu);
-
-				# Restrict responses to requested searchmax or 500
-				# Youtube API appears to be limited to 1000, but does not always return 1000 results so restrict to 500
-				my $total = min($json->{'feed'}->{'openSearch$totalResults'}->{'$t'}, $args->{'searchmax'} || 500, 500);
-				
-				$log->debug("this page: " . scalar @$menu . " total: $total");
-
-				if (scalar @$menu < $quantity && $total > $index + scalar @$menu && scalar @$menu > $before) {
-					
-					# get some more if we have yet to build the required page for client
-					$fetch->();
-					
-				} else {
-
-					$callback->({
-						items  => $menu,
-						offset => $index - 1,
-						total  => $total,
-					});
-				}
-			},
-			
-			sub {
-				$log->warn("error: $_[1]");
-				$callback->([ { name => $_[1], type => 'text' } ]);
-			},
-			
-		)->get($queryUrl);
-	};
-		
-	$fetch->();
-}
-
-sub testHandler {
-	my ($client, $callback, $args, $feed, $parser, $term) = @_;
-
-	# use paging on interfaces which allow otherwise fetch 200 entries for button mode
-	my $index    = ($args->{'index'} || 0) + 1;
-	my $quantity = $args->{'quantity'} || 200;
-	my $search   = $args->{'search'} ? "q=$args->{search}" : '';
-	$term ||= '';
 	
 	my $menu = [];
 	
@@ -308,8 +256,8 @@ sub testHandler {
 		my $max = min($quantity - scalar @$menu, 50); # api allows max of 50 items per response
 		
     # todo, formatting
-    # todo, offset
-		my $queryUrl = "http://api.soundcloud.com/tracks.json?client_id=ff21e0d51f1ea3baf9607a1d072c564f&limit=10"; # + $quantity;
+    # todo, offset/limit/etc
+		my $queryUrl = "http://api.soundcloud.com/tracks.json?client_id=$CLIENT_ID&limit=10&filter=streamable&" . $params;
 
 		$log->info("fetching: $queryUrl");
 		
@@ -325,23 +273,15 @@ sub testHandler {
 				
 				my $before = scalar @$menu;
 
-				# parse json response into menu entries
-        use Data::Dumper;
-        #$log->warn(Dumper($json));
-        #$log->warn(Dumper($json->[0]));
-        #$log->warn(Dumper($json->[1]));
-        #$log->warn(Dumper(@$json));
       for my $entry (@$json) {
-          $log->warn("entry");
-          $log->warn(Dumper($entry));
           if ($entry->{'streamable'}) {
             push @$menu, {
               name => $entry->{'title'},
               type => 'audio',
               on_select => 'play',
               playall => 0,
-              url  => $entry->{'stream_url'} . "?client_id=ff21e0d51f1ea3baf9607a1d072c564f",
-              play => $entry->{'stream_url'} . "?client_id=ff21e0d51f1ea3baf9607a1d072c564f",
+              url  => $entry->{'permalink_url'},
+              play => $entry->{'stream_url'} . "?client_id=$CLIENT_ID",
               icon => $entry->{'artwork_url'} || "",
             };
           }
@@ -523,7 +463,7 @@ sub searchInfoMenu {
 	$query = URI::Escape::uri_escape_utf8($query);
 
 	return {
-		name => string('PLUGIN_YOUTUBE'),
+		name => string('PLUGIN_SOUNDCLOUD'),
 		items => [
 			{
 				name => string('PLUGIN_YOUTUBE_SEARCH'),
