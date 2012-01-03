@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Connect with SoundCloud</title>
+  </head>
+  <body onload="">
+    <script>
+function getQueryVariable(variable) { 
+  var query = window.location.hash.substring(1); 
+  var vars = query.split("&"); 
+  for (var i=0;i<vars.length;i++) { 
+    var pair = vars[i].split("="); 
+    if (pair[0] == variable) { 
+      return pair[1]; 
+    } 
+  } 
+  alert('Query Variable ' + variable + ' not found'); 
+} 
+
+var apiKey = getQueryVariable('access_token');
+if (!!apiKey) {
+  document.write('Your api key is: <b>' + apiKey + '</b>');
+} else {
+  document.write('something went wrong :-(');
+}
+    </script>
+  </body>
+</html>

@@ -1,6 +1,6 @@
 set -x
 cd ..
-zip -r SoundCloud SoundCloud -x \*.zip \*.sh \*.git\* \*README\*
+zip -r SoundCloud SoundCloud -x \*.zip \*.sh \*.git\* \*README\* \*webauth\*
 mv SoundCloud.zip SoundCloud
 cd SoundCloud
 
