@@ -14,7 +14,7 @@ sub page {
 }
 
 sub prefs {
-	return (preferences('plugin.soundcloud'), qw(apikey));
+	return (preferences('plugin.soundcloud'), qw(apiKey));
 }
 
 1;

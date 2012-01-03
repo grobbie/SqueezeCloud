@@ -7,12 +7,12 @@ package Plugins::SoundCloud::Plugin;
 # TODO
 # debug playlist search offset
 # make playall work on playlists
+# [12-01-02 23:01:44.7847] Slim::Web::Settings::handler (153) Preference names must be prefixed by "pref_" in the page template: apiKey (PLUGIN_SOUNDCLOUD)
 # fix titles
 # uri escape things
 # add optional user to title
 # can we show description?
 # is there pagination for /tracks
-# get search working -- tags, query
 # get accounts working <-- long way off
 
 use strict;
@@ -56,7 +56,7 @@ BEGIN {
 
 my $prefs = preferences('plugin.soundcloud');
 
-$prefs->init({ apiKey => "" });
+#$prefs->init({ apiKey => "" });
 
 tie my %recentlyPlayed, 'Tie::Cache::LRU', 20;
 
@@ -144,7 +144,7 @@ sub saveRecentlyPlayed {
 sub toplevel {
 	my ($client, $callback, $args) = @_;
 
-	$callback->([
+  my $callbacks = [
 		{ name => string('PLUGIN_SOUNDCLOUD_HOT'), type => 'link',   
 		  url  => \&tracksHandler, passthrough => [ { params => 'order=hotness' } ], },
 
@@ -163,10 +163,21 @@ sub toplevel {
 		{ name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_SEARCH'), type => 'search',
 		  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
 
-#		{ name => string('PLUGIN_YOUTUBE_RECENTLYPLAYED'), url  => \&recentHandler, },
-
 		{ name => string('PLUGIN_SOUNDCLOUD_URL'), type => 'search', url  => \&urlHandler, },
-	]);
+	];
+
+  $log->info($prefs->get('apiKey'));
+  $log->info("PREFS: " . Dumper($prefs));
+  if ($prefs->get('apiKey') ne '') {
+    $log->info('adding favorites');
+    push(@$callbacks, 
+      { name => string('PLUGIN_SOUNDCLOUD_FAVORITES'), type => 'link',
+		    url  => \&tracksHandler, passthrough => [ { type => 'favorites' } ] }
+    );
+    $log->info(Dumper($callbacks));
+  }
+
+	$callback->($callbacks);
 }
 
 sub urlHandler {
@@ -264,6 +275,8 @@ sub tracksHandler {
     $log->warn("i: " + $i);
 		my $max = min($quantity - scalar @$menu, 200); # api allows max of 200 items per response
     $log->warn("max: " + $max);
+    
+    my $method = "http";
 	
     # todo, formatting
     # todo, offset/limit/etc
@@ -278,11 +291,20 @@ sub tracksHandler {
       } else {
         $resource = "playlists/$id.json";
       }
+    } elsif ($searchType eq 'favorites') {
+      $method = "https";
+      $resource = "me/favorites.json";
     } else {
       $params .= "&filter=streamable";
     }
 
-		my $queryUrl = "http://api.soundcloud.com/$resource?client_id=$CLIENT_ID&offset=$i&limit=$quantity&" . $params . "&" . $search;
+    if ($prefs->get('apiKey')) {
+      $params .= "&oauth_token=" . $prefs->get('apiKey');
+    } else {
+      $params .= "&client_id=$CLIENT_ID";
+    }
+
+		my $queryUrl = "$method://api.soundcloud.com/$resource?offset=$i&limit=$quantity&" . $params . "&" . $search;
 
 		$log->warn("fetching: $queryUrl");
 		

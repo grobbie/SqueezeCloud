@@ -1,12 +1,8 @@
 [% PROCESS settings/header.html %]
 
-	[% WRAPPER setting title="PLUGIN_SOUNDCLOUD_BANNER" %]
-		<div>[% "PLUGIN_SOUNDCLOUD_BANNER_TEXT" | string %]</div>
-	[% END %]
-
 	[% WRAPPER setting title="PLUGIN_SOUNDCLOUD_APIKEY" desc="PLUGIN_SOUNDCLOUD_APIKEY_DESC" %]
 		<div class="prefDesc">
-      <input type="text" class="stdedit" name="apikey" id="apiley" value="[% prefs.apikey %]" size="40" />
+      <input type="text" class="stdedit" name="pref_apiKey" value="[% prefs.apiKey %]" size="40" />
 		</div>
 
 	[% END %]
