@@ -148,11 +148,11 @@ sub urlHandler {
         $callback->({
           items => [ {
             name => $json->{'title'},
-            type => 'link',
-            # type => 'audio',
+            type => 'audio',
             url  => $json->{'permalink_url'},
             play => addClientId($json->{'stream_url'}),
             icon => $json->{'artwork_url'} || "",
+            image => $json->{'artwork_url'} || "",
             cover => $json->{'artwork_url'} || "",
           } ]
         })
@@ -218,7 +218,7 @@ sub tracksHandler {
       $params .= "&filter=streamable";
     }
 
-    if ($prefs->get('apiKey')) {
+    if ($authenticated && $prefs->get('apiKey')) {
       $method = "https";
       $params .= "&oauth_token=" . $prefs->get('apiKey');
     } else {
@@ -273,9 +273,19 @@ sub tracksHandler {
 sub addClientId {
   my ($url) = shift;
   if ($url =~ /\?/) {
-    return $url . "&client_id=$CLIENT_ID";
+    if (0 && $prefs->get('apiKey')) {
+      $log->info($url . "&oauth_token=" . $prefs->get('apiKey'));
+      return $url . "&oauth_token=" . $prefs->get('apiKey');
+    } else {
+      return $url . "&client_id=$CLIENT_ID";
+    }
   } else {
-    return $url . "?client_id=$CLIENT_ID";
+    if (0 && $prefs->get('apiKey')) {
+      $log->info($url . "?oauth_token=" . $prefs->get('apiKey'));
+      return $url . "?oauth_token=" . $prefs->get('apiKey');
+    } else {
+      return $url . "?client_id=$CLIENT_ID";
+    }
   }
 }
 
@@ -285,13 +295,14 @@ sub _parseTracks {
     if ($entry->{'streamable'}) {
       push @$menu, {
         name => $entry->{'title'},
-        type => 'link',
-        #type => 'audio',
+        type => 'audio',
         on_select => 'play',
         playall => 0,
         url  => $entry->{'permalink_url'},
         play => addClientId($entry->{'stream_url'}),
         icon => $entry->{'artwork_url'} || "",
+        image => $entry->{'artwork_url'} || "",
+        cover => $entry->{'artwork_url'} || "",
       };
     }
   }
