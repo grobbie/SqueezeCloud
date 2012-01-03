@@ -5,8 +5,8 @@ package Plugins::SoundCloud::Plugin;
 # Released under GPLv2
 
 # TODO
+# at some point, I'm going to give up on using xmlbrowser for this because not all searches are repeatable :-/
 # debug playlist search offset
-# make playall work on playlists
 # [12-01-02 23:01:44.7847] Slim::Web::Settings::handler (153) Preference names must be prefixed by "pref_" in the page template: apiKey (PLUGIN_SOUNDCLOUD)
 # fix titles
 # uri escape things
@@ -168,15 +168,12 @@ sub urlHandler {
 
 sub tracksHandler {
 	my ($client, $callback, $args, $passDict) = @_;
-  $log->warn(Dumper(@_));
 
 	my $index    = ($args->{'index'} || 0); # ie, offset
 	my $quantity = $args->{'quantity'} || 200;
   my $searchType = $passDict->{'type'};
   my $searchStr = ($searchType eq 'tags') ? "tags=$args->{search}" : "q=$args->{search}";
 	my $search   = $args->{'search'} ? $searchStr : '';
-
-  $log->warn(Dumper($passDict));
 
   my $parser = $passDict->{'parser'} || \&_parseTracks;
   my $params = $passDict->{'params'} || '';
@@ -202,9 +199,7 @@ sub tracksHandler {
     
     my $method = "http";
 	
-    # todo, formatting
-    # todo, offset/limit/etc
-    # TODO: make these params work
+    my $authenticated = 0;
     my $resource = "tracks.json";
     if ($searchType eq 'playlists') {
       $log->warn("id? " .$passDict->{'pid'});
@@ -216,13 +211,14 @@ sub tracksHandler {
         $resource = "playlists/$id.json";
       }
     } elsif ($searchType eq 'favorites') {
-      $method = "https";
       $resource = "me/favorites.json";
+      $authenticated = 1;
     } else {
       $params .= "&filter=streamable";
     }
 
-    if ($prefs->get('apiKey')) {
+    if ($authenticated && $prefs->get('apiKey')) {
+      $method = "https";
       $params .= "&oauth_token=" . $prefs->get('apiKey');
     } else {
       $params .= "&client_id=$CLIENT_ID";
@@ -283,12 +279,13 @@ sub addClientId {
 }
 
 sub _parseTracks {
-	my ($json, $menu, $playall) = @_;
+	my ($json, $menu) = @_;
   for my $entry (@$json) {
     if ($entry->{'streamable'}) {
       push @$menu, {
         name => $entry->{'title'},
-        type => 'audio',
+        type => 'link',
+        #type => 'audio',
         on_select => 'play',
         playall => 0,
         url  => $entry->{'permalink_url'},
@@ -315,10 +312,9 @@ sub _parsePlaylists {
         name => $entry->{'title'},
         type => 'playlist',
         url => \&tracksHandler,
-        playall => 1,
+        playall => 0,
         passthrough => [ { type => 'playlists', pid => $entry->{'id'}, parser => \&_parsePlaylistTracks }],
       };
-      $log->warn(Dumper($menu));
     }
   }
 }

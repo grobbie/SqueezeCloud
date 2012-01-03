@@ -3,7 +3,7 @@
 <extension>
 	<name>PLUGIN_SOUNDCLOUD</name>
 	<module>Plugins::SoundCloud::Plugin</module>
-	<version>0.21</version>
+	<version>0.3</version>
 	<description>PLUGIN_SOUNDCLOUD_DESC</description>
 	<icon>plugins/SoundCloud/icon.png</icon>
 	<defaultState>enabled</defaultState>
