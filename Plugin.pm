@@ -104,20 +104,18 @@ sub toplevel {
 
 		{ name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_SEARCH'), type => 'search',
 		  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
-
-		{ name => string('PLUGIN_SOUNDCLOUD_URL'), type => 'search', url  => \&urlHandler, },
 	];
 
-  $log->info($prefs->get('apiKey'));
-  $log->info("PREFS: " . Dumper($prefs));
   if ($prefs->get('apiKey') ne '') {
-    $log->info('adding favorites');
     push(@$callbacks, 
       { name => string('PLUGIN_SOUNDCLOUD_FAVORITES'), type => 'link',
 		    url  => \&tracksHandler, passthrough => [ { type => 'favorites' } ] }
     );
-    $log->info(Dumper($callbacks));
   }
+
+  push(@$callbacks, 
+		{ name => string('PLUGIN_SOUNDCLOUD_URL'), type => 'search', url  => \&urlHandler, }
+  );
 
 	$callback->($callbacks);
 }
@@ -149,7 +147,8 @@ sub urlHandler {
         $callback->({
           items => [ {
             name => $json->{'title'},
-            type => 'audio',
+            type => 'link',
+            # type => 'audio',
             url  => $json->{'permalink_url'},
             play => addClientId($json->{'stream_url'}),
             icon => $json->{'artwork_url'} || "",
@@ -314,7 +313,7 @@ sub _parsePlaylists {
       $log->warn('putting in ' . $entry->{'id'});
       push @$menu, {
         name => $entry->{'title'},
-        type => 'link',
+        type => 'playlist',
         url => \&tracksHandler,
         playall => 1,
         passthrough => [ { type => 'playlists', pid => $entry->{'id'}, parser => \&_parsePlaylistTracks }],
