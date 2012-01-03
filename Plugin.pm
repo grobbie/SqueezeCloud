@@ -218,7 +218,7 @@ sub tracksHandler {
       $params .= "&filter=streamable";
     }
 
-    if ($authenticated && $prefs->get('apiKey')) {
+    if ($prefs->get('apiKey')) {
       $method = "https";
       $params .= "&oauth_token=" . $prefs->get('apiKey');
     } else {
