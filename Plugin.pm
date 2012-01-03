@@ -5,7 +5,6 @@ package Plugins::SoundCloud::Plugin;
 # Released under GPLv2
 
 # TODO
-# at some point, I'm going to give up on using xmlbrowser for this because not all searches are repeatable :-/
 # debug playlist search offset
 # [12-01-02 23:01:44.7847] Slim::Web::Settings::handler (153) Preference names must be prefixed by "pref_" in the page template: apiKey (PLUGIN_SOUNDCLOUD)
 # fix titles
@@ -302,14 +301,24 @@ sub _parsePlaylistTracks {
 }
 
 sub _parsePlaylists {
-# TODO add duration here
-# TODO add # of tracks 
 	my ($json, $menu) = @_;
   for my $entry (@$json) {
     if ($entry->{'streamable'}) {
-      $log->warn('putting in ' . $entry->{'id'});
+      my $title = $entry->{'title'};
+      my $numTracks = length(@{$entry->{'tracks'}} || []);
+      my $titleInfo .= "$numTracks tracks";
+
+      my $totalSeconds = ($entry->{'duration'} || 0) / 1000;
+      if ($totalSeconds != 0) {
+        my $minutes = int($totalSeconds / 60);
+        my $seconds = $totalSeconds % 60;
+        $titleInfo .= " ${minutes}m${seconds}s";
+      }
+
+      $title .= " ($titleInfo)";
+
       push @$menu, {
-        name => $entry->{'title'},
+        name => $title,
         type => 'playlist',
         url => \&tracksHandler,
         playall => 0,
