@@ -5,7 +5,7 @@ SOUNDCLOUD
 	EN	SoundCloud
 
 PLUGIN_SOUNDCLOUD_DESC
-	EN	Play audio from YouTube videos.  WARNING: this plugin will use more network bandwidth than other streaming services as the entire video is being streamed even though only the audio is played.
+	EN	Play music from Soundcloud. Supports top tracks, playlists and urls.
 
 PLUGIN_SOUNDCLOUD_HOT
 	EN	Hottest Tracks
@@ -28,53 +28,8 @@ PLUGIN_SOUNDCLOUD_PLAYLIST_SEARCH
 PLUGIN_SOUNDCLOUD_PLAYLIST_BROWSE
 	EN	Playlists
 
+PLUGIN_SOUNDCLOUD_APIKEY
+	EN	Soundcloud Api Key
 
-PLUGIN_YOUTUBE_POP
-	EN	Most Popular Music
-
-PLUGIN_YOUTUBE_RECENT
-	EN	Most Recent Music
-
-PLUGIN_YOUTUBE_FAV
-	EN	Favorite Music
-
-PLUGIN_YOUTUBE_SEARCH
-	EN	YouTube Search
-
-PLUGIN_YOUTUBE_MUSICSEARCH
-	EN	Music Search
-
-PLUGIN_YOUTUBE_CHANNELSEARCH
-	EN	Channel Search
-
-
-PLUGIN_YOUTUBE_RECENTLYPLAYED
-	EN	Recently Played
-
-PLUGIN_YOUTUBE_BADURL
-	EN	Bad YouTube URL
-
-PLUGIN_YOUTUBE_ON_YOUTUBE
-	EN	On YouTube
-
-PLUGIN_YOUTUBE_WEBLINK
-	EN	Watch YouTube Video
-
-PLUGIN_YOUTUBE_PLAYLINK
-	EN	Play Video
-
-PLUGIN_YOUTUBE_BANNER
-	EN	WARNING
-
-PLUGIN_YOUTUBE_BANNER_TEXT
-	EN	Please note that this plugin streams the entire YouTube video file to playback the audio stream.  This will use use significantly more network bandwidth than audio only streaming.  Please consider this if your internet connection has a usage charge.
-
-PLUGIN_YOUTUBE_PREFER_LOWBITRATE
-	EN	Preferred Streams
-
-PLUGIN_YOUTUBE_LOWRES
-	EN	Prefer Low Resolution
-
-PLUGIN_YOUTUBE_PREFER_LOWBITRATE_DESC
-	EN	Select to prefer lower quality audio from low resolution YouTube videos to use less network bandwidth.
-
+PLUGIN_SOUNDCLOUD_APIKEY_DESC
+	EN	Soundcloud Api Key Desc

@@ -12,4 +12,9 @@
 		<minVersion>7.5</minVersion>
         <maxVersion>7.*</maxVersion>
 	</targetApplication>
+  <optionsURL>plugins/SoundCloud/settings/basic.html</optionsURL>
+  <creator>David Blackman</creator>
+  <email>david+squeezecloud@whizziwig.com</email>
+  
+  
 </extension>

@@ -1,13 +1,12 @@
 [% PROCESS settings/header.html %]
 
-	[% WRAPPER setting title="PLUGIN_YOUTUBE_BANNER" %]
-		<div>[% "PLUGIN_YOUTUBE_BANNER_TEXT" | string %]</div>
+	[% WRAPPER setting title="PLUGIN_SOUNDCLOUD_BANNER" %]
+		<div>[% "PLUGIN_SOUNDCLOUD_BANNER_TEXT" | string %]</div>
 	[% END %]
 
-	[% WRAPPER setting title="PLUGIN_YOUTUBE_PREFER_LOWBITRATE" desc="PLUGIN_YOUTUBE_PREFER_LOWBITRATE_DESC" %]
-
-		<div class="prefDesc">[% "PLUGIN_YOUTUBE_LOWRES" | string %]
-			<input name="pref_prefer_lowbitrate" type="checkbox" [% IF prefs.pref_prefer_lowbitrate %] checked [% END %]>
+	[% WRAPPER setting title="PLUGIN_SOUNDCLOUD_APIKEY" desc="PLUGIN_SOUNDCLOUD_APIKEY_DESC" %]
+		<div class="prefDesc">
+      <input type="text" class="stdedit" name="apikey" id="apiley" value="[% prefs.apikey %]" size="40" />
 		</div>
 
 	[% END %]

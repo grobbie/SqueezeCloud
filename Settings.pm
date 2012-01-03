@@ -14,7 +14,7 @@ sub page {
 }
 
 sub prefs {
-	return (preferences('plugin.youtube'), qw(prefer_lowbitrate));
+	return (preferences('plugin.soundcloud'), qw(apikey));
 }
 
 1;

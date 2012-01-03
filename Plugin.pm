@@ -56,7 +56,7 @@ BEGIN {
 
 my $prefs = preferences('plugin.soundcloud');
 
-$prefs->init({ prefer_lowbitrate => 0, recent => [] });
+$prefs->init({ apiKey => "" });
 
 tie my %recentlyPlayed, 'Tie::Cache::LRU', 20;
 
