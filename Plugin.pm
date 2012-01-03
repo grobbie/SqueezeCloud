@@ -56,9 +56,7 @@ BEGIN {
 
 my $prefs = preferences('plugin.soundcloud');
 
-#$prefs->init({ apiKey => "" });
-
-tie my %recentlyPlayed, 'Tie::Cache::LRU', 20;
+$prefs->init({ apiKey => "" });
 
 sub initPlugin {
 	my $class = shift;
@@ -71,75 +69,19 @@ sub initPlugin {
 		weight => 10,
 	);
 
-#	Slim::Menu::TrackInfo->registerInfoProvider( youtube => (
-#		after => 'middle',
-#		func  => \&trackInfoMenu,
-#	) );
-#
-#	Slim::Menu::TrackInfo->registerInfoProvider( youtubevideo => (
-#		after => 'bottom',
-#		func  => \&webVideoLink,
-#	) );
-#
-#	Slim::Menu::ArtistInfo->registerInfoProvider( youtube => (
-#		after => 'middle',
-#		func  => \&artistInfoMenu,
-#	) );
-#
-#	Slim::Menu::GlobalSearch->registerInfoProvider( youtube => (
-#		after => 'middle',
-#		name  => 'PLUGIN_SOUNDCLOUD',
-#		func  => \&searchInfoMenu,
-#	) );
-
 	if (!$::noweb) {
 		require Plugins::SoundCloud::Settings;
 		Plugins::SoundCloud::Settings->new;
 	}
-
-	for my $recent (reverse @{$prefs->get('recent')}) {
-		$recentlyPlayed{ $recent->{'url'} } = $recent;
-	}
-
-	#Slim::Control::Request::addDispatch(['youtube', 'info'], [1, 1, 1, \&cliInfoQuery]);
 }
 
 sub shutdownPlugin {
 	my $class = shift;
-
-	$class->saveRecentlyPlayed('now');
 }
 
 sub getDisplayName { 'PLUGIN_SOUNDCLOUD' }
 
 sub playerMenu { shift->can('nonSNApps') ? undef : 'RADIO' }
-
-sub updateRecentlyPlayed {
-	my ($class, $info) = @_;
-
-	$recentlyPlayed{ $info->{'url'} } = $info;
-
-	$class->saveRecentlyPlayed;
-}
-
-sub saveRecentlyPlayed {
-	my $class = shift;
-	my $now   = shift;
-
-	unless ($now) {
-		Slim::Utils::Timers::killTimers($class, \&saveRecentlyPlayed);
-		Slim::Utils::Timers::setTimer($class, time() + 10, \&saveRecentlyPlayed, 'now');
-		return;
-	}
-
-	my @played;
-
-	for my $key (reverse keys %recentlyPlayed) {
-		unshift @played, $recentlyPlayed{ $key };
-	}
-
-	$prefs->set('recent', \@played);
-}
 
 sub toplevel {
 	my ($client, $callback, $args) = @_;
@@ -223,23 +165,6 @@ sub urlHandler {
 	};
 		
 	$fetch->();
-}
-
-sub recentHandler {
-	my ($client, $callback, $args) = @_;
-
-	my @menu;
-
-	for my $item(reverse values %recentlyPlayed) {
-		unshift  @menu, {
-			name => $item->{'name'},
-			url  => $item->{'url'},
-			icon => $item->{'icon'},
-			type => 'audio',
-		};
-	}
-
-	$callback->({ items => \@menu });
 }
 
 sub tracksHandler {
@@ -397,112 +322,6 @@ sub _parsePlaylists {
       $log->warn(Dumper($menu));
     }
   }
-}
-
-
-sub trackInfoMenu {
-	my ($client, $url, $track, $remoteMeta) = @_;
-	
-	my $artist = ($remoteMeta && $remoteMeta->{artist}) || ($track && $track->artistName);
-
-	$artist = URI::Escape::uri_escape_utf8($artist);
-
-	if ($artist) {
-		return {
-			type      => 'opml',
-			name      => string('PLUGIN_YOUTUBE_ON_YOUTUBE'),
-			url       => sub {
-				my ($client, $callback, $args) = @_;
-				$args->{'search'} = $artist;
-				$args->{'searchmax'} = 200; # only get 200 entries within context menu
-				my $cb = !$compat ? $callback : sub { $callback->(shift->{'items'}) };
-				searchHandler($client, $cb, $args, 'videos', \&_parseVideos);
-			},
-			favorites => 0,
-		};
-	} else {
-		return {};
-	}
-}
-
-sub artistInfoMenu {
-	my ($client, $url, $obj, $remoteMeta) = @_;
-	
-	my $artist = ($remoteMeta && $remoteMeta->{artist}) || ($obj && $obj->name);
-
-	$artist = URI::Escape::uri_escape_utf8($artist);
-
-	if ($artist) {
-		return {
-			type      => 'opml',
-			name      => string('PLUGIN_YOUTUBE_ON_YOUTUBE'),
-			url       => sub {
-				my ($client, $callback, $args) = @_;
-				$args->{'search'} = $artist;
-				$args->{'searchmax'} = 200; # only get 200 entries within context menu
-				my $cb = !$compat ? $callback : sub { $callback->(shift->{'items'}) };
-				searchHandler($client, $cb, $args, 'videos', \&_parseVideos);
-			},
-			favorites => 0,
-		};
-	} else {
-		return {};
-	}
-}
-
-sub searchInfoMenu {
-	my ($client, $tags) = @_;
-
-	my $query = $tags->{'search'};
-
-	$query = URI::Escape::uri_escape_utf8($query);
-
-	return {
-		name => string('PLUGIN_SOUNDCLOUD'),
-		items => [
-			{
-				name => string('PLUGIN_YOUTUBE_SEARCH'),
-				type => 'link',
-				url  => sub {
-					my ($client, $callback, $args) = @_;
-					$args->{'search'} = $query; 
-					my $cb = !$compat ? $callback : sub { $callback->(shift->{'items'}) };
-					searchHandler($client, $cb, $args, 'videos', \&_parseVideos);
-				},
-				favorites => 0,
-			},
-			{
-				name => string('PLUGIN_YOUTUBE_MUSICSEARCH'),
-				type => 'link',
-				url  => sub {
-					my ($client, $callback, $args) = @_;
-					$args->{'search'} = $query; 
-					my $cb = !$compat ? $callback : sub { $callback->(shift->{'items'}) };
-					searchHandler($client, $cb, $args, 'videos', \&_parseVideos, 'category=music');
-				},
-				favorites => 0,
-			},
-		   ],
-	};
-}
-
-# special query to allow weblink to be sent to iPeng
-sub cliInfoQuery {
-	my $request = shift;
-	
-	if ($request->isNotQuery([['youtube'], ['info']])) {
-		$request->setStatusBadDispatch();
-		return;
-	}
-
-	my $id = $request->getParam('id');
-
-	$request->addResultLoop('item_loop', 0, 'text', string('PLUGIN_YOUTUBE_PLAYLINK'));
-	$request->addResultLoop('item_loop', 0, 'weblink', "http://www.youtube.com/v/$id");
-	$request->addResult('count', 1);
-	$request->addResult('offset', 0);
-	
-	$request->setStatusDone();
 }
 
 1;
