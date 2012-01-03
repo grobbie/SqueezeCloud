@@ -1,0 +1,16 @@
+<extensions>
+<details>
+<title lang="EN">Whizziwig's Plugins</title>
+</details>
+<plugins>
+<plugin name="SoundCloud" version="0.21" minTarget="7.5" maxTarget="*">
+<title lang="EN">SoundCloud</title>
+<desc lang="EN">Browse, search and play urls from soundcloud</desc>
+<url>http://whizziwig.com/static/squeezecloud/SoundCloud.zip</url>
+<link>https://github.com/blackmad/squeezecloud</link>
+<sha>d9ec5061c6479c7c5be0f4d58fb1de1138b0cf25</sha>
+<creator>David Blackman</creator>
+<email>david+squeezecloud@whizziwig.com</email>
+</plugin>
+</plugins>
+</extensions>
