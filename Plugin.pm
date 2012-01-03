@@ -98,11 +98,13 @@ sub toplevel {
     { name => string('PLUGIN_SOUNDCLOUD_TAGS'), type => 'search',   
 		  url  => \&tracksHandler, passthrough => [ { type => 'tags', params => 'order=hotness' } ], },
 
-    { name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_BROWSE'), type => 'link',
-		  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
+# new playlists change too quickly for this to work reliably, the way xmlbrowser needs to replay the requests
+# from the top.
+#    { name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_BROWSE'), type => 'link',
+#		  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
 
-		{ name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_SEARCH'), type => 'search',
-		  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
+#		{ name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_SEARCH'), type => 'search',
+#		  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
 	];
 
   if ($prefs->get('apiKey') ne '') {
