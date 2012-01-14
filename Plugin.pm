@@ -20,6 +20,8 @@ use vars qw(@ISA);
 
 use URI::Escape;
 use JSON::XS::VersionOneAndTwo;
+use LWP::Simple;
+use LWP::UserAgent;
 use File::Spec::Functions qw(:ALL);
 use List::Util qw(min max);
 
@@ -33,12 +35,14 @@ my $log;
 my $compat;
 my $CLIENT_ID = "ff21e0d51f1ea3baf9607a1d072c564f";
 
+my %METADATA_CACHE= {};
+
 BEGIN {
 	$log = Slim::Utils::Log->addLogCategory({
 		'category'     => 'plugin.soundcloud',
 		'defaultLevel' => 'INFO',
 		'description'  => string('PLUGIN_SOUNDCLOUD'),
-	}); 
+	});   
 
 	# Always use OneBrowser version of XMLBrowser by using server or packaged version included with plugin
 	if (exists &Slim::Control::XMLBrowser::findAction) {
@@ -72,7 +76,130 @@ sub initPlugin {
 		require Plugins::SoundCloud::Settings;
 		Plugins::SoundCloud::Settings->new;
 	}
+
+  Slim::Formats::RemoteMetadata->registerProvider(
+    match => qr/soundcloud\.com/,
+    func => \&metadata_provider,
+  );
 }
+
+sub defaultMeta {
+	my ( $client, $url ) = @_;
+	
+	return {
+		title => Slim::Music::Info::getCurrentTitle($url)
+	};
+}
+
+# TODO: make this async
+sub metadata_provider {
+  my ( $client, $url ) = @_;
+  if (exists $METADATA_CACHE{$url}) {
+    #$log->warn(Dumper($METADATA_CACHE{$url}));
+    return $METADATA_CACHE{$url};
+  } elsif ($url =~ /ak-media.soundcloud.com\/(.*\.mp3)/) {
+    #$log->warn($1);
+    #$log->warn($METADATA_CACHE{$1});
+    return $METADATA_CACHE{$1};
+  } elsif ( !$client->master->pluginData('webapifetchingMeta') ) {
+		# Fetch metadata in the background
+		Slim::Utils::Timers::killTimers( $client, \&fetchMetadata );
+    $client->master->pluginData( webapifetchingMeta => 1 );
+		fetchMetadata( $client, $url );
+	}
+	
+	return defaultMeta( $client, $url );
+}
+
+sub fetchMetadata {
+  my ( $client, $url ) = @_;
+  $log->warn($url);
+ 
+  if ($url =~ /tracks\/\d+\/stream/) {
+    my $queryUrl = $url;
+    $queryUrl =~ s/\/stream/.json/;
+    $log->warn($queryUrl);
+
+    my $http = Slim::Networking::SimpleAsyncHTTP->new(
+      \&_gotMetadata,
+      \&_gotMetadataError,
+      {
+        client     => $client,
+        url        => $url,
+        timeout    => 30,
+      },
+    );
+
+    $http->get($queryUrl);
+  }
+}
+
+sub _gotMetadata {
+	my $http      = shift;
+	my $client    = $http->params('client');
+	my $url       = $http->params('url');
+	my $content   = $http->content;
+
+
+	if ( $@ ) {
+		$http->error( $@ );
+		_gotMetadataError( $http );
+		return;
+	}
+
+	$client->master->pluginData( webapifetchingMeta => 0 );
+    
+  my $json = eval { from_json($content) };
+
+  my $DATA = {
+    #duration => $json->{'duration'} / 1000,
+    name => $json->{'title'},
+    title => $json->{'title'},
+    artist => $json->{'user'}->{'username'},
+    type => 'audio',
+    icon => $json->{'artwork_url'} || "",
+    image => $json->{'artwork_url'} || "",
+    cover => $json->{'artwork_url'} || "",
+  };
+  $log->warn(Dumper($DATA));
+
+  my $ua = LWP::UserAgent->new(
+    requests_redirectable => [],
+  );
+
+  my $res = $ua->get( addClientId($json->{'stream_url'}) );
+
+  print $res->status_line, "\n", 'Location: ', $res->header( 'location' ), "\n";
+  my $stream = $res->header( 'location' );
+
+  if ($stream =~ /ak-media.soundcloud.com\/(.*\.mp3)/) {
+    $log->warn($stream);
+    $log->warn($1);
+    $METADATA_CACHE{$1} = $DATA;
+    $METADATA_CACHE{$url} = $DATA;
+  }
+
+  return;
+}
+
+sub _gotMetadataError {
+	my $http   = shift;
+	my $client = $http->params('client');
+	my $url    = $http->params('url');
+	my $error  = $http->error;
+	
+	$log->is_debug && $log->debug( "Error fetching Web API metadata: $error" );
+	
+	$client->master->pluginData( webapifetchingMeta => 0 );
+	
+	# To avoid flooding the BBC servers in the case of errors, we just ignore further
+	# metadata for this station if we get an error
+	my $meta = defaultMeta( $client, $url );
+	$meta->{_url} = $url;
+	
+	$client->master->pluginData( webapimetadata => $meta );
+}
+
 
 sub shutdownPlugin {
 	my $class = shift;
