@@ -157,11 +157,12 @@ sub _gotMetadata {
     title => $json->{'title'},
     artist => $json->{'user'}->{'username'},
     type => 'audio',
+    #url  => $json->{'permalink_url'},
+    link => $json->{'permalink_url'},
     icon => $json->{'artwork_url'} || "",
     image => $json->{'artwork_url'} || "",
     cover => $json->{'artwork_url'} || "",
   };
-  $log->warn(Dumper($DATA));
 
   my $ua = LWP::UserAgent->new(
     requests_redirectable => [],
@@ -169,12 +170,9 @@ sub _gotMetadata {
 
   my $res = $ua->get( addClientId($json->{'stream_url'}) );
 
-  print $res->status_line, "\n", 'Location: ', $res->header( 'location' ), "\n";
   my $stream = $res->header( 'location' );
 
   if ($stream =~ /ak-media.soundcloud.com\/(.*\.mp3)/) {
-    $log->warn($stream);
-    $log->warn($1);
     $METADATA_CACHE{$1} = $DATA;
     $METADATA_CACHE{$url} = $DATA;
   }
@@ -260,7 +258,6 @@ sub urlHandler {
   $url =~ s/ com/.com/;
   $url =~ s/www /www./;
 
-  $log->warn($args->{'search'});
   # TODO: url escape this
   my $queryUrl = "http://api.soundcloud.com/resolve.json?url=$url&client_id=$CLIENT_ID";
   $log->warn($queryUrl);
@@ -270,10 +267,6 @@ sub urlHandler {
 			sub {
 				my $http = shift;
 				my $json = eval { from_json($http->content) };
-				
-				if ($@) {
-					$log->warn($@);
-				}
 				
 # TODO: combine this with parseTrack
         $callback->({
@@ -309,7 +302,6 @@ sub tracksHandler {
 
   my $parser = $passDict->{'parser'} || \&_parseTracks;
   my $params = $passDict->{'params'} || '';
-  $log->warn($params);
 
   $log->warn('search type: ' . $searchType);
   $log->warn("index: " . $index);
@@ -334,7 +326,6 @@ sub tracksHandler {
     my $authenticated = 0;
     my $resource = "tracks.json";
     if ($searchType eq 'playlists') {
-      $log->warn("id? " .$passDict->{'pid'});
       my $id = $passDict->{'pid'} || '';
       if ($id eq '') {
         $resource = "playlists.json";
