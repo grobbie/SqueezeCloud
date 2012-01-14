@@ -239,6 +239,10 @@ sub toplevel {
       { name => string('PLUGIN_SOUNDCLOUD_FAVORITES'), type => 'link',
 		    url  => \&tracksHandler, passthrough => [ { type => 'favorites' } ] }
     );
+    push(@$callbacks, 
+      { name => string('PLUGIN_SOUNDCLOUD_FRIENDS_FAVORITES'), type => 'link',
+		  url  => \&tracksHandler, passthrough => [ { type => 'friends', parser => \&_parseFriends} ] },
+    );
   }
 
   push(@$callbacks, 
@@ -325,7 +329,7 @@ sub tracksHandler {
 		my $max = min($quantity - scalar @$menu, 200); # api allows max of 200 items per response
     $log->warn("max: " + $max);
     
-    my $method = "http";
+    my $method = "https";
 	
     my $authenticated = 0;
     my $resource = "tracks.json";
@@ -339,7 +343,15 @@ sub tracksHandler {
         $resource = "playlists/$id.json";
       }
     } elsif ($searchType eq 'favorites') {
-      $resource = "me/favorites.json";
+      my $id = $passDict->{'uid'} || '';
+      if ($id eq '') {
+        $resource = "me/favorites.json";
+      } else {
+        $resource = "users/$id/favorites.json";
+      }
+      $authenticated = 1;
+    } elsif ($searchType eq 'friends') {
+      $resource = "me/followings.json";
       $authenticated = 1;
     } else {
       $params .= "&filter=streamable";
@@ -370,6 +382,9 @@ sub tracksHandler {
   
         # max offset = 8000, max index = 200 sez soundcloud http://developers.soundcloud.com/docs#pagination
         my $total = 8000 + $quantity;
+        if (exists $passDict->{'total'}) {
+          $total = $passDict->{'total'}
+        }
 				
 				$log->info("this page: " . scalar @$menu . " total: $total");
 
@@ -420,13 +435,15 @@ sub _parseTracks {
 	my ($json, $menu) = @_;
   for my $entry (@$json) {
     if ($entry->{'streamable'}) {
+      my $stream = addClientId($entry->{'stream_url'});
+      $stream =~ s/https/http/;
       push @$menu, {
         name => $entry->{'title'},
         type => 'audio',
         on_select => 'play',
         playall => 0,
         url  => $entry->{'permalink_url'},
-        play => addClientId($entry->{'stream_url'}),
+        play => $stream,
         icon => $entry->{'artwork_url'} || "",
         image => $entry->{'artwork_url'} || "",
         cover => $entry->{'artwork_url'} || "",
@@ -467,5 +484,27 @@ sub _parsePlaylists {
     }
   }
 }
+
+sub _parseFriends {
+	my ($json, $menu) = @_;
+  for my $entry (@$json) {
+    my $image = $entry->{'avatar_url'};
+    my $name = $entry->{'full_name'} || $entry->{'username'};
+    my $favorite_count = $entry->{'public_favorites_count'};
+    my $id = $entry->{'id'};
+
+    #if ($favorite_count != 0) {
+      push @$menu, {
+        name => $name. " (" . $favorite_count . " favorites)",
+        icon => $image,
+        image => $image,
+        type => 'link',
+        url => \&tracksHandler,
+        passthrough => [ { type => 'favorites', uid => $id, max => $favorite_count }],
+      };
+    #}
+  }
+}
+
 
 1;
