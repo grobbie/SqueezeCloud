@@ -1,5 +1,5 @@
 soundcloud plugin for squeezebox server, based off YouTube plugin
 
-install xml at http://www.whizziwig.com/static/squeezecloud/public.xml
+Now listed in the semi-official 3rd party repo.
 
-add it via settings -> plugins -> additional repositories
+add it via settings -> plugins -> Show all 3rd party plugins -> Soundcloud
