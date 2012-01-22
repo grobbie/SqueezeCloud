@@ -5,14 +5,7 @@ package Plugins::SoundCloud::Plugin;
 # Released under GPLv2
 
 # TODO
-# debug playlist search offset
-# [12-01-02 23:01:44.7847] Slim::Web::Settings::handler (153) Preference names must be prefixed by "pref_" in the page template: apiKey (PLUGIN_SOUNDCLOUD)
-# fix titles
-# uri escape things
-# add optional user to title
-# can we show description?
-# is there pagination for /tracks
-# get accounts working <-- long way off
+# playall, sucks
 
 use strict;
 
@@ -234,6 +227,11 @@ sub toplevel {
 
   if ($prefs->get('apiKey') ne '') {
     push(@$callbacks, 
+      { name => string('PLUGIN_SOUNDCLOUD_ACTIVITIES'), type => 'link',
+		    url  => \&tracksHandler, passthrough => [ { type => 'activities', parser => \&_parseActivities} ] }
+    );
+
+    push(@$callbacks, 
       { name => string('PLUGIN_SOUNDCLOUD_FAVORITES'), type => 'link',
 		    url  => \&tracksHandler, passthrough => [ { type => 'favorites' } ] }
     );
@@ -327,6 +325,7 @@ sub tracksHandler {
     my $resource = "tracks.json";
     if ($searchType eq 'playlists') {
       my $id = $passDict->{'pid'} || '';
+      $authenticated = 1;
       if ($id eq '') {
         $resource = "playlists.json";
         $quantity = 10;
@@ -343,6 +342,9 @@ sub tracksHandler {
       $authenticated = 1;
     } elsif ($searchType eq 'friends') {
       $resource = "me/followings.json";
+      $authenticated = 1;
+    } elsif ($searchType eq 'activities') {
+      $resource = "me/activities/all.json";
       $authenticated = 1;
     } else {
       $params .= "&filter=streamable";
@@ -423,6 +425,7 @@ sub addClientId {
 }
 
 sub _parseTracks {
+  $log->info("parsing tracks");
 	my ($json, $menu) = @_;
   for my $entry (@$json) {
     if ($entry->{'streamable'}) {
@@ -448,30 +451,92 @@ sub _parsePlaylistTracks {
   _parseTracks($json->{'tracks'}, $menu, 1);
 }
 
+sub _parsePlaylist {
+	my ($entry) = @_;
+  $log->info(Dumper($entry));
+  my $title = $entry->{'title'};
+  $log->info($title);
+  my $numTracks = 0;
+  my $titleInfo = "";
+  if (exists $entry->{'tracks'}) {
+    $numTracks = length(@{$entry->{'tracks'}});
+    $titleInfo .= "$numTracks tracks";
+  }
+
+  my $totalSeconds = ($entry->{'duration'} || 0) / 1000;
+  if ($totalSeconds != 0) {
+    my $minutes = int($totalSeconds / 60);
+    my $seconds = $totalSeconds % 60;
+    if (length($titleInfo) > 0) {
+      $titleInfo .= " ";
+    }
+    $titleInfo .= "${minutes}m${seconds}s";
+  }
+
+  $title .= " ($titleInfo)";
+  $log->info($title);
+
+  return {
+    name => $title,
+    type => 'link',
+    url => \&tracksHandler,
+    #playall => 1,
+    passthrough => [ { type => 'playlists', pid => $entry->{'id'}, parser => \&_parsePlaylistTracks }],
+  };
+}
+
 sub _parsePlaylists {
 	my ($json, $menu) = @_;
   for my $entry (@$json) {
-    if ($entry->{'streamable'}) {
-      my $title = $entry->{'title'};
-      my $numTracks = length(@{$entry->{'tracks'}} || []);
-      my $titleInfo .= "$numTracks tracks";
+    push @$menu, _parsePlaylist($entry);
+  }
+}
 
-      my $totalSeconds = ($entry->{'duration'} || 0) / 1000;
-      if ($totalSeconds != 0) {
-        my $minutes = int($totalSeconds / 60);
-        my $seconds = $totalSeconds % 60;
-        $titleInfo .= " ${minutes}m${seconds}s";
+sub _parseActivities {
+	my ($json, $menu) = @_;
+  my $collection = $json->{'collection'};
+  for my $entry (@$collection) {
+    my $created_at = $entry->{'created_at'};
+    my $origin = $entry->{'origin'};
+    my $tags = $entry->{'tags'};
+    my $type = $entry->{'type'};
+
+    if ($type =~ /playlist.*/) {
+      my $playlist = $origin->{'playlist'};
+      my $playlistItem = _parsePlaylist($playlist);
+      
+      my $user = $playlist->{'user'};
+      my $user_name = $user->{'full_name'} || $user->{'username'};
+
+      $playlistItem->{'name'} = $playlistItem->{'name'} . " shared by " . $user_name;
+      push @$menu, $playlistItem;
+    } else {
+      my $track = $origin->{'track'};
+      my $user = $origin->{'user'};
+      my $user_name = $user->{'full_name'} || $user->{'username'};
+
+      my $subtitle = "";
+      if ($type == "favoriting") {
+        $subtitle = "favorited by $user_name";
+      } elsif ($type == "comment") {
+        $subtitle = "commented on by $user_name";
+      } elsif ($type =~ /track/) {
+        $subtitle = "new track by $user_name";
+      } else {
+        $subtitle = "shared by $user_name";
       }
 
-      $title .= " ($titleInfo)";
 
       push @$menu, {
-        name => $title,
-        type => 'playlist',
-        url => \&tracksHandler,
-        playall => 0,
-        passthrough => [ { type => 'playlists', pid => $entry->{'id'}, parser => \&_parsePlaylistTracks }],
-      };
+        name => $track->{'title'} . " " . $subtitle,
+        #artist => $subtitle,
+        type => 'audio',
+        url  => $track->{'permalink_url'},
+        play => addClientId($track->{'stream_url'}),
+        icon => $track->{'artwork_url'} || "",
+        image => $track->{'artwork_url'} || "",
+        cover => $track->{'artwork_url'} || "",
+      }
     }
   }
 }
