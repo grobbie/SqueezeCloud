@@ -3,3 +3,8 @@ soundcloud plugin for squeezebox server, based off YouTube plugin
 Now listed in the semi-official 3rd party repo.
 
 add it via settings -> plugins -> Show all 3rd party plugins -> Soundcloud
+
+TODO:
+--figure out how to make playall work
+--friends tracks
+--always use authenticated on track lookup?
