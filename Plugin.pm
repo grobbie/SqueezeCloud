@@ -87,6 +87,7 @@ sub defaultMeta {
 # TODO: make this async
 sub metadata_provider {
   my ( $client, $url ) = @_;
+ $log->warn($url);
   if (exists $METADATA_CACHE{$url}) {
     #$log->warn(Dumper($METADATA_CACHE{$url}));
     return $METADATA_CACHE{$url};
@@ -106,7 +107,7 @@ sub metadata_provider {
 
 sub fetchMetadata {
   my ( $client, $url ) = @_;
-  $log->warn($url);
+  $log->warn("fetching metadata for: " + $url);
  
   if ($url =~ /tracks\/\d+\/stream/) {
     my $queryUrl = $url;
@@ -150,6 +151,8 @@ sub _gotMetadata {
     title => $json->{'title'},
     artist => $json->{'user'}->{'username'},
     type => 'audio',
+    mime => 'audio/mpeg',
+    play => addClientId($json->{'stream_url'}),
     #url  => $json->{'permalink_url'},
     link => $json->{'permalink_url'},
     icon => $json->{'artwork_url'} || "",
@@ -221,8 +224,8 @@ sub toplevel {
 #    { name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_BROWSE'), type => 'link',
 #		  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
 
-#		{ name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_SEARCH'), type => 'search',
-#		  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
+		{ name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_SEARCH'), type => 'search',
+   	  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
 	];
 
   if ($prefs->get('apiKey') ne '') {
@@ -427,16 +430,17 @@ sub addClientId {
 sub _parseTracks {
   $log->info("parsing tracks");
 	my ($json, $menu) = @_;
+
   for my $entry (@$json) {
     if ($entry->{'streamable'}) {
       my $stream = addClientId($entry->{'stream_url'});
       $stream =~ s/https/http/;
+      print Dumper($entry);
       push @$menu, {
         name => $entry->{'title'},
         type => 'audio',
         on_select => 'play',
-        playall => 0,
-        url  => $entry->{'permalink_url'},
+        # url  => $entry->{'permalink_url'},
         play => $stream,
         icon => $entry->{'artwork_url'} || "",
         image => $entry->{'artwork_url'} || "",
@@ -459,7 +463,7 @@ sub _parsePlaylist {
   my $numTracks = 0;
   my $titleInfo = "";
   if (exists $entry->{'tracks'}) {
-    $numTracks = length(@{$entry->{'tracks'}});
+    $numTracks = length($entry->{'tracks'});
     $titleInfo .= "$numTracks tracks";
   }
 
@@ -478,9 +482,8 @@ sub _parsePlaylist {
 
   return {
     name => $title,
-    type => 'link',
+    type => 'playlist',
     url => \&tracksHandler,
-    #playall => 1,
     passthrough => [ { type => 'playlists', pid => $entry->{'id'}, parser => \&_parsePlaylistTracks }],
   };
 }
@@ -531,6 +534,7 @@ sub _parseActivities {
         name => $track->{'title'} . " " . $subtitle,
         #artist => $subtitle,
         type => 'audio',
+        'mime' => 'audio/mpeg',
         url  => $track->{'permalink_url'},
         play => addClientId($track->{'stream_url'}),
         icon => $track->{'artwork_url'} || "",
@@ -543,22 +547,26 @@ sub _parseActivities {
 
 sub _parseFriends {
 	my ($json, $menu) = @_;
+  my $i = 0;
   for my $entry (@$json) {
     my $image = $entry->{'avatar_url'};
     my $name = $entry->{'full_name'} || $entry->{'username'};
     my $favorite_count = $entry->{'public_favorites_count'};
     my $id = $entry->{'id'};
 
-    #if ($favorite_count != 0) {
+    if ($favorite_count != 0) {
       push @$menu, {
         name => $name. " (" . $favorite_count . " favorites)",
         icon => $image,
         image => $image,
         type => 'link',
+        play_index => $i,
+        path => $i,
         url => \&tracksHandler,
         passthrough => [ { type => 'favorites', uid => $id, max => $favorite_count }],
       };
-    #}
+    }
+    $i++;
   }
 }
 
