@@ -87,7 +87,7 @@ sub defaultMeta {
 # TODO: make this async
 sub metadata_provider {
   my ( $client, $url ) = @_;
- $log->warn($url);
+  #$log->warn($url);
   if (exists $METADATA_CACHE{$url}) {
     #$log->warn(Dumper($METADATA_CACHE{$url}));
     return $METADATA_CACHE{$url};
@@ -239,7 +239,7 @@ sub toplevel {
 		    url  => \&tracksHandler, passthrough => [ { type => 'favorites' } ] }
     );
     push(@$callbacks, 
-      { name => string('PLUGIN_SOUNDCLOUD_FRIENDS_FAVORITES'), type => 'link',
+      { name => string('PLUGIN_SOUNDCLOUD_FRIENDS'), type => 'link',
 		  url  => \&tracksHandler, passthrough => [ { type => 'friends', parser => \&_parseFriends} ] },
     );
   }
@@ -261,26 +261,29 @@ sub urlHandler {
 
   # TODO: url escape this
   my $queryUrl = "http://api.soundcloud.com/resolve.json?url=$url&client_id=$CLIENT_ID";
-  $log->warn($queryUrl);
+  #$log->warn($queryUrl);
 
   my $fetch = sub {
 		Slim::Networking::SimpleAsyncHTTP->new(
 			sub {
 				my $http = shift;
 				my $json = eval { from_json($http->content) };
-				
-# TODO: combine this with parseTrack
-        $callback->({
-          items => [ {
-            name => $json->{'title'},
-            type => 'audio',
-            url  => $json->{'permalink_url'},
-            play => addClientId($json->{'stream_url'}),
-            icon => $json->{'artwork_url'} || "",
-            image => $json->{'artwork_url'} || "",
-            cover => $json->{'artwork_url'} || "",
-          } ]
-        })
+
+        if (exists $json->{'tracks'}) {
+          $callback->({ items => [ _parsePlaylist($json) ] });
+        } else {
+          $callback->({
+            items => [ {
+              name => $json->{'title'},
+              type => 'audio',
+              #url  => $json->{'permalink_url'},
+              play => addClientId($json->{'stream_url'}),
+              icon => $json->{'artwork_url'} || "",
+              image => $json->{'artwork_url'} || "",
+              cover => $json->{'artwork_url'} || "",
+            } ]
+          })
+        }
 			},
 			sub {
 				$log->warn("error: $_[1]");
@@ -323,6 +326,7 @@ sub tracksHandler {
     $log->warn("max: " + $max);
     
     my $method = "https";
+    my $uid = $passDict->{'uid'} || '';
 	
     my $authenticated = 0;
     my $resource = "tracks.json";
@@ -330,21 +334,30 @@ sub tracksHandler {
       my $id = $passDict->{'pid'} || '';
       $authenticated = 1;
       if ($id eq '') {
-        $resource = "playlists.json";
-        $quantity = 10;
+        if ($uid eq '') {
+          $resource = "playlists.json";
+          $quantity = 30;
+        } else {
+          $resource = "users/$uid/playlists.json";
+        }
       } else {
         $resource = "playlists/$id.json";
       }
+    } if ($searchType eq 'tracks') {
+      $authenticated = 1;
+      $resource = "users/$uid/tracks.json";
     } elsif ($searchType eq 'favorites') {
-      my $id = $passDict->{'uid'} || '';
-      if ($id eq '') {
+      if ($uid eq '') {
         $resource = "me/favorites.json";
       } else {
-        $resource = "users/$id/favorites.json";
+        $resource = "users/$uid/favorites.json";
       }
       $authenticated = 1;
     } elsif ($searchType eq 'friends') {
       $resource = "me/followings.json";
+      $authenticated = 1;
+    } elsif ($searchType eq 'friend') {
+      $resource = "users/$uid.json";
       $authenticated = 1;
     } elsif ($searchType eq 'activities') {
       $resource = "me/activities/all.json";
@@ -370,10 +383,6 @@ sub tracksHandler {
 				my $http = shift;
 				my $json = eval { from_json($http->content) };
 				
-				if ($@) {
-					$log->warn($@);
-				}
-
         $parser->($json, $menu); 
   
         # max offset = 8000, max index = 200 sez soundcloud http://developers.soundcloud.com/docs#pagination
@@ -389,12 +398,18 @@ sub tracksHandler {
           $total = $index + @$menu;
           $log->debug("short page, truncate total to $total");
         }
+       
+        # awful hack
+        if ($searchType eq 'friend' && (defined $args->{'index'})) {
+          my @tmpmenu = $menu->[$index];
+          $menu = \@tmpmenu;
+        }
 					
-					$callback->({
-						items  => $menu,
-						offset => $index,
-						total  => $total,
-					});
+        $callback->({
+          items  => $menu,
+          offset => $index,
+          total  => $total,
+        });
 			},
 			
 			sub {
@@ -435,7 +450,6 @@ sub _parseTracks {
     if ($entry->{'streamable'}) {
       my $stream = addClientId($entry->{'stream_url'});
       $stream =~ s/https/http/;
-      print Dumper($entry);
       push @$menu, {
         name => $entry->{'title'},
         type => 'audio',
@@ -463,7 +477,7 @@ sub _parsePlaylist {
   my $numTracks = 0;
   my $titleInfo = "";
   if (exists $entry->{'tracks'}) {
-    $numTracks = length($entry->{'tracks'});
+    $numTracks = scalar(@{$entry->{'tracks'}});
     $titleInfo .= "$numTracks tracks";
   }
 
@@ -552,23 +566,59 @@ sub _parseFriends {
     my $image = $entry->{'avatar_url'};
     my $name = $entry->{'full_name'} || $entry->{'username'};
     my $favorite_count = $entry->{'public_favorites_count'};
+    my $track_count = $entry->{'track_count'};
+    my $playlist_count = $entry->{'playlist_count'};
     my $id = $entry->{'id'};
 
-    if ($favorite_count != 0) {
-      push @$menu, {
-        name => $name. " (" . $favorite_count . " favorites)",
-        icon => $image,
-        image => $image,
-        type => 'link',
-        play_index => $i,
-        path => $i,
-        url => \&tracksHandler,
-        passthrough => [ { type => 'favorites', uid => $id, max => $favorite_count }],
-      };
-    }
-    $i++;
+    push @$menu, {
+      name => sprintf("%s (%d favorites, %d tracks, %d sets)",
+        $name, $favorite_count, $track_count, $playlist_count),
+      icon => $image,
+      image => $image,
+      type => 'link',
+      url => \&tracksHandler,
+      passthrough => [ { type => 'friend', uid => $id, parser => \&_parseFriend} ]
+    };
   }
 }
 
+sub _parseFriend {
+	my ($entry, $menu) = @_;
+
+  my $image = $entry->{'avatar_url'};
+  my $name = $entry->{'full_name'} || $entry->{'username'};
+  my $favorite_count = $entry->{'public_favorites_count'};
+  my $track_count = $entry->{'track_count'};
+  my $playlist_count = $entry->{'playlist_count'};
+  my $id = $entry->{'id'};
+
+  push @$menu, {
+    name => sprintf("%d Favorites", $favorite_count),
+    icon => $image,
+    image => $image,
+    type => 'playlist',
+    url => \&tracksHandler,
+    passthrough => [ { type => 'favorites', uid => $id, max => $favorite_count }],
+  };
+
+  push @$menu, {
+    name => sprintf("%d Tracks", $favorite_count),
+    icon => $image,
+    image => $image,
+    type => 'playlist',
+    url => \&tracksHandler,
+    passthrough => [ { type => 'tracks', uid => $id, max => $track_count }],
+  };
+
+  push @$menu, {
+    name => sprintf("%d Playlists", $playlist_count),
+    icon => $image,
+    image => $image,
+    type => 'link',
+    url => \&tracksHandler,
+    passthrough => [ { type => 'playlists', uid => $id, max => $playlist_count,
+      parser => \&_parsePlaylists } ]
+  };
+}
 
 1;
