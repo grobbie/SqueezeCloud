@@ -30,6 +30,7 @@ my $CLIENT_ID = "ff21e0d51f1ea3baf9607a1d072c564f";
 
 my %METADATA_CACHE= {};
 
+
 BEGIN {
 	$log = Slim::Utils::Log->addLogCategory({
 		'category'     => 'plugin.soundcloud',
@@ -87,13 +88,9 @@ sub defaultMeta {
 # TODO: make this async
 sub metadata_provider {
   my ( $client, $url ) = @_;
-  #$log->warn($url);
   if (exists $METADATA_CACHE{$url}) {
-    #$log->warn(Dumper($METADATA_CACHE{$url}));
     return $METADATA_CACHE{$url};
   } elsif ($url =~ /ak-media.soundcloud.com\/(.*\.mp3)/) {
-    #$log->warn($1);
-    #$log->warn($METADATA_CACHE{$1});
     return $METADATA_CACHE{$1};
   } elsif ( !$client->master->pluginData('webapifetchingMeta') ) {
 		# Fetch metadata in the background
@@ -107,12 +104,10 @@ sub metadata_provider {
 
 sub fetchMetadata {
   my ( $client, $url ) = @_;
-  $log->warn("fetching metadata for: " + $url);
  
   if ($url =~ /tracks\/\d+\/stream/) {
     my $queryUrl = $url;
     $queryUrl =~ s/\/stream/.json/;
-    $log->warn($queryUrl);
 
     my $http = Slim::Networking::SimpleAsyncHTTP->new(
       \&_gotMetadata,
@@ -127,6 +122,37 @@ sub fetchMetadata {
     $http->get($queryUrl);
   }
 }
+
+sub _makeMetadata {
+  my ($json) = shift;
+  my $stream = addClientId($json->{'stream_url'});
+  $stream =~ s/https/http/;
+  my $DATA = {
+    #duration => $json->{'duration'} / 1000,
+    name => $json->{'title'},
+    title => $json->{'title'},
+    artist => $json->{'user'}->{'username'},
+    type => 'audio',
+    mime => 'audio/mpeg',
+    play => $stream,
+    #url  => $json->{'permalink_url'},
+    link => $json->{'permalink_url'},
+    icon => $json->{'artwork_url'} || "",
+    image => $json->{'artwork_url'} || "",
+    cover => $json->{'artwork_url'} || "",
+  };
+   
+   
+  my %DATA1 = %$DATA;
+  my %DATA2 = %$DATA;
+  my %DATA3 = %$DATA;
+
+  $METADATA_CACHE{$DATA->{'play'}} = \%DATA1;
+  $METADATA_CACHE{$DATA->{'link'}} = \%DATA2;
+
+  return \%DATA3;
+}
+
 
 sub _gotMetadata {
 	my $http      = shift;
@@ -145,20 +171,7 @@ sub _gotMetadata {
     
   my $json = eval { from_json($content) };
 
-  my $DATA = {
-    #duration => $json->{'duration'} / 1000,
-    name => $json->{'title'},
-    title => $json->{'title'},
-    artist => $json->{'user'}->{'username'},
-    type => 'audio',
-    mime => 'audio/mpeg',
-    play => addClientId($json->{'stream_url'}),
-    #url  => $json->{'permalink_url'},
-    link => $json->{'permalink_url'},
-    icon => $json->{'artwork_url'} || "",
-    image => $json->{'artwork_url'} || "",
-    cover => $json->{'artwork_url'} || "",
-  };
+  my $DATA = _makeMetadata($json);
 
   my $ua = LWP::UserAgent->new(
     requests_redirectable => [],
@@ -169,8 +182,12 @@ sub _gotMetadata {
   my $stream = $res->header( 'location' );
 
   if ($stream =~ /ak-media.soundcloud.com\/(.*\.mp3)/) {
-    $METADATA_CACHE{$1} = $DATA;
-    $METADATA_CACHE{$url} = $DATA;
+    my %DATA1 = %$DATA;
+    my %DATA2 = %$DATA;
+    my %DATA3 = %$DATA;
+    $METADATA_CACHE{$1} = \%DATA1;
+    $METADATA_CACHE{$json->{'stream_url'}} = \%DATA2;
+    $METADATA_CACHE{addClientId($json->{'stream_url'})} = \%DATA3;
   }
 
   return;
@@ -448,18 +465,7 @@ sub _parseTracks {
 
   for my $entry (@$json) {
     if ($entry->{'streamable'}) {
-      my $stream = addClientId($entry->{'stream_url'});
-      $stream =~ s/https/http/;
-      push @$menu, {
-        name => $entry->{'title'},
-        type => 'audio',
-        on_select => 'play',
-        # url  => $entry->{'permalink_url'},
-        play => $stream,
-        icon => $entry->{'artwork_url'} || "",
-        image => $entry->{'artwork_url'} || "",
-        cover => $entry->{'artwork_url'} || "",
-      };
+      push @$menu, _makeMetadata($entry);
     }
   }
 }
@@ -543,18 +549,10 @@ sub _parseActivities {
         $subtitle = "shared by $user_name";
       }
 
-
-      push @$menu, {
-        name => $track->{'title'} . " " . $subtitle,
-        #artist => $subtitle,
-        type => 'audio',
-        'mime' => 'audio/mpeg',
-        url  => $track->{'permalink_url'},
-        play => addClientId($track->{'stream_url'}),
-        icon => $track->{'artwork_url'} || "",
-        image => $track->{'artwork_url'} || "",
-        cover => $track->{'artwork_url'} || "",
-      }
+      my $trackentry = makeMetadata($track);
+      $trackentry->{'name'} = $track->{'title'} . " " . $subtitle;
+      
+      push @$menu, %$trackentry;
     }
   }
 }
