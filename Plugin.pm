@@ -24,6 +24,8 @@ use Slim::Utils::Log;
 
 use Data::Dumper;
 
+use Plugins::SoundCloud::ProtocolHandler;
+
 my $log;
 my $compat;
 my $CLIENT_ID = "ff21e0d51f1ea3baf9607a1d072c564f";
@@ -34,7 +36,7 @@ my %METADATA_CACHE= {};
 BEGIN {
 	$log = Slim::Utils::Log->addLogCategory({
 		'category'     => 'plugin.soundcloud',
-		'defaultLevel' => 'INFO',
+		'defaultLevel' => 'DEBUG',
 		'description'  => string('PLUGIN_SOUNDCLOUD'),
 	});   
 
@@ -74,6 +76,10 @@ sub initPlugin {
   Slim::Formats::RemoteMetadata->registerProvider(
     match => qr/soundcloud\.com/,
     func => \&metadata_provider,
+  );
+
+  Slim::Player::ProtocolHandlers->registerHandler(
+    soundcloud => 'Plugins::SoundCloud::ProtocolHandler'
   );
 }
 
@@ -132,11 +138,10 @@ sub _makeMetadata {
     name => $json->{'title'},
     title => $json->{'title'},
     artist => $json->{'user'}->{'username'},
-    type => 'audio',
-    mime => 'audio/mpeg',
-    play => $stream,
+    #play => $stream,
+    play => "soundcloud://" . $json->{'id'},
     #url  => $json->{'permalink_url'},
-    link => $json->{'permalink_url'},
+    #link => "soundcloud://" . $json->{'id'},
     icon => $json->{'artwork_url'} || "",
     image => $json->{'artwork_url'} || "",
     cover => $json->{'artwork_url'} || "",
@@ -290,15 +295,7 @@ sub urlHandler {
           $callback->({ items => [ _parsePlaylist($json) ] });
         } else {
           $callback->({
-            items => [ {
-              name => $json->{'title'},
-              type => 'audio',
-              #url  => $json->{'permalink_url'},
-              play => addClientId($json->{'stream_url'}),
-              icon => $json->{'artwork_url'} || "",
-              image => $json->{'artwork_url'} || "",
-              cover => $json->{'artwork_url'} || "",
-            } ]
+            items => [ _makeMetadata($json) ]
           })
         }
 			},
