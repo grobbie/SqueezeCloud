@@ -1,20 +1,18 @@
 <?xml version="1.0"?>
 
 <extension>
-	<name>PLUGIN_SOUNDCLOUD</name>
-	<module>Plugins::SoundCloud::Plugin</module>
-	<version>0.41</version>
-	<description>PLUGIN_SOUNDCLOUD_DESC</description>
-	<icon>plugins/SoundCloud/icon.png</icon>
+	<name>PLUGIN_SQUEEZECLOUD</name>
+	<module>Plugins::SqueezeCloud::Plugin</module>
+	<version>0.8.2</version>
+	<description>PLUGIN_SQUEEZECLOUD_DESC</description>
+	<icon>plugins/SqueezeCloud/icon.png</icon>
 	<defaultState>enabled</defaultState>
 	<targetApplication>
 		<id>SlimServer</id>
 		<minVersion>7.5</minVersion>
-        <maxVersion>7.*</maxVersion>
+        	<maxVersion>7.*</maxVersion>
 	</targetApplication>
-  <optionsURL>plugins/SoundCloud/settings/basic.html</optionsURL>
-  <creator>David Blackman</creator>
-  <email>david+squeezecloud@whizziwig.com</email>
-  
-  
+  	<optionsURL>plugins/SqueezeCloud/settings/basic.html</optionsURL>
+  	<creator>Robert Gibbon, David Blackman</creator>
+  	<email>robSPAMMENOTgibbon@me.com</email>
 </extension>
