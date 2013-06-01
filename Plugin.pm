@@ -145,7 +145,7 @@ sub _makeMetadata {
     		play => "soundcloud://" . $json->{'id'},
     		#url  => $json->{'permalink_url'},
     		#link => "soundcloud://" . $json->{'id'},
-    		icon => $json->{'artwork_url'} || "",
+    		#icon => $json->{'artwork_url'} || "",
     		image => $json->{'artwork_url'} || "",
     		cover => $json->{'artwork_url'} || "",
   	};
@@ -475,7 +475,7 @@ sub _parsePlaylistTracks {
 
 sub _parsePlaylist {
 	my ($entry) = @_;
-	$log->info(Dumper($entry));
+	#$log->info(Dumper($entry));
 	my $title = $entry->{'title'};
   	$log->info($title);
   	my $numTracks = 0;
@@ -516,6 +516,7 @@ sub _parsePlaylists {
 sub _parseActivities {
 	my ($json, $menu) = @_;
   	my $collection = $json->{'collection'};
+
   	for my $entry (@$collection) {
     		my $created_at = $entry->{'created_at'};
     		my $origin = $entry->{'origin'};
