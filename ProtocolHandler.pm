@@ -141,7 +141,16 @@ sub gotNextTrack {
   	my $stream = addClientId($track->{'stream_url'});
   	$stream =~ s/https/http/;
   	$log->info($stream);
-  	$song->streamUrl($stream);
+
+	my $ua = LWP::UserAgent->new(
+                requests_redirectable => [],
+        );
+
+        my $res = $ua->get($stream);
+
+        my $redirector = $res->header( 'location' );
+
+  	$song->streamUrl($redirector);
 
   	my $meta = _makeMetadata($track);
   	$song->duration( $meta->{duration} );
