@@ -44,7 +44,7 @@ sub _makeMetadata {
     		#url  => $json->{'permalink_url'},
     		#link => "soundcloud://" . $json->{'id'},
     		bitrate   => '128k',
-  		type      => 'MP3 (Soundcloud)',
+  		type      => 'MP3 stream (soundcloud.com)',
     		#info_link => $json->{'permalink_url'},
     		icon => $json->{'artwork_url'} || "",
     		image => $json->{'artwork_url'} || "",

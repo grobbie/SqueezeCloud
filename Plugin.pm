@@ -114,6 +114,7 @@ sub fetchMetadata {
   	my ( $client, $url ) = @_;
  
   	if ($url =~ /tracks\/\d+\/stream/) {
+
     		my $queryUrl = $url;
     		$queryUrl =~ s/\/stream/.json/;
 
@@ -283,7 +284,7 @@ sub urlHandler {
   	$url =~ s/www /www./;
 
   	# TODO: url escape this
-  	my $queryUrl = "https://api.soundcloud.com/resolve.json?url=$url&client_id=$CLIENT_ID";
+  	my $queryUrl = "http://api.soundcloud.com/resolve.json?url=$url&client_id=$CLIENT_ID";
   	#$log->warn($queryUrl);
 
   	my $fetch = sub {
