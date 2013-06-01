@@ -284,7 +284,7 @@ sub urlHandler {
   	$url =~ s/www /www./;
 
   	# TODO: url escape this
-  	my $queryUrl = "https://api.soundcloud.com/resolve.json?url=$url&client_id=$CLIENT_ID";
+  	my $queryUrl = "http://api.soundcloud.com/resolve.json?url=$url&client_id=$CLIENT_ID";
   	#$log->warn($queryUrl);
 
   	my $fetch = sub {
@@ -547,7 +547,7 @@ sub _parseActivities {
         			$subtitle = "shared by $user_name";
       			}
 
-      			my $trackentry = makeMetadata($track);
+      			my $trackentry = _makeMetadata($track);
       			$trackentry->{'name'} = $track->{'title'} . " " . $subtitle;
       
       			push @$menu, %$trackentry;
