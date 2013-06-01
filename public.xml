@@ -3,12 +3,12 @@
 		<title lang="EN">SqueezeCloud Plugin</title>
 	</details>
 	<plugins>
-		<plugin name="SqueezeCloud" version="0.8.2.7" minTarget="7.5" maxTarget="*">
+		<plugin name="SqueezeCloud" version="0.8.2.8" minTarget="7.5" maxTarget="*">
 			<title lang="EN">SqueezeCloud</title>
 			<desc lang="EN">Browse, search and play urls from soundcloud</desc>
 			<url>http://grobbie.github.io/SqueezeCloud/SqueezeCloud.zip</url>
 			<link>https://github.com/grobbie/SqueezeCloud</link>
-			<sha>0645d6199bb548e7c78d1253e23f139e6cf3fcbc</sha>
+			<sha>5364288f131747f4e290fae1c1b6ee533a772b3f</sha>
 			<creator>Robert Gibbon, David Blackman</creator>
 			<email>robSPAMMENOTgibbon@me.com</email>
 		</plugin>
