@@ -70,14 +70,14 @@ sub initPlugin {
 		Plugins::SqueezeCloud::Settings->new;
 	}
 
-  Slim::Formats::RemoteMetadata->registerProvider(
-    match => qr/soundcloud\.com/,
-    func => \&metadata_provider,
-  );
+  	Slim::Formats::RemoteMetadata->registerProvider(
+    		match => qr/soundcloud\.com/,
+    		func => \&metadata_provider,
+  	);
 
-  Slim::Player::ProtocolHandlers->registerHandler(
-    squeezecloud => 'Plugins::SqueezeCloud::ProtocolHandler'
-  );
+  	Slim::Player::ProtocolHandlers->registerHandler(
+    		soundcloud => 'Plugins::SqueezeCloud::ProtocolHandler'
+  	);
 }
 
 sub defaultMeta {
