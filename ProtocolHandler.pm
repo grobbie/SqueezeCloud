@@ -23,10 +23,10 @@ my $prefs = preferences('plugin.squeezecloud');
 
 my %fetching; # hash of ids we are fetching metadata for to avoid multiple fetches
 
-Slim::Player::ProtocolHandlers->registerHandler('soundcloud', __PACKAGE__);
+Slim::Player::ProtocolHandlers->registerHandler('squeezecloud', __PACKAGE__);
 
 use strict;
-use base 'Slim::Player::Protocols::HTTP';
+use base 'Slim::Player::Protocols::HTTPS';
 
 sub canSeek { 1 }
 

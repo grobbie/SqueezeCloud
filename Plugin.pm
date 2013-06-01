@@ -59,7 +59,7 @@ sub initPlugin {
 
 	$class->SUPER::initPlugin(
 		feed   => \&toplevel,
-		tag    => 'soundcloud',
+		tag    => 'squeezecloud',
 		menu   => 'radios',
 		is_app => $class->can('nonSNApps') ? 1 : undef,
 		weight => 10,
@@ -76,7 +76,7 @@ sub initPlugin {
   );
 
   Slim::Player::ProtocolHandlers->registerHandler(
-    soundcloud => 'Plugins::SqueezeCloud::ProtocolHandler'
+    squeezecloud => 'Plugins::SqueezeCloud::ProtocolHandler'
   );
 }
 
@@ -284,7 +284,7 @@ sub urlHandler {
   	$url =~ s/www /www./;
 
   	# TODO: url escape this
-  	my $queryUrl = "http://api.soundcloud.com/resolve.json?url=$url&client_id=$CLIENT_ID";
+  	my $queryUrl = "https://api.soundcloud.com/resolve.json?url=$url&client_id=$CLIENT_ID";
   	#$log->warn($queryUrl);
 
   	my $fetch = sub {
