@@ -5,6 +5,7 @@ package Plugins::SqueezeCloud::Plugin;
 # Released under GPLv2
 
 use strict;
+use utf8;
 
 use vars qw(@ISA);
 
@@ -136,18 +137,24 @@ sub _makeMetadata {
   	my ($json) = shift;
   	my $stream = addClientId($json->{'stream_url'});
   	$stream =~ s/https/http/;
+
+	my $icon = "";
+	if (defined $json->{'artwork_url'}) {
+		$icon = $json->{'artwork_url'};		
+	}
+
   	my $DATA = {
     		#duration => $json->{'duration'} / 1000,
     		name => $json->{'title'},
     		title => $json->{'title'},
-    		artist => $json->{'user'}->{'username'},
+    		artist = $json->{'user'}->{'username'} || "";
     		#play => $stream,
     		play => "soundcloud://" . $json->{'id'},
     		#url  => $json->{'permalink_url'},
     		#link => "soundcloud://" . $json->{'id'},
-    		#icon => $json->{'artwork_url'} || "",
-    		image => $json->{'artwork_url'} || "",
-    		cover => $json->{'artwork_url'} || "",
+    		icon => $icon,
+    		image => $icon,
+    		cover => $icon,
   	};
    
   	my %DATA1 = %$DATA;
