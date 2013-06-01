@@ -26,14 +26,14 @@ my %fetching; # hash of ids we are fetching metadata for to avoid multiple fetch
 Slim::Player::ProtocolHandlers->registerHandler('soundcloud', __PACKAGE__);
 
 use strict;
-use base 'Slim::Player::Protocols::HTTPS';
+use base 'Slim::Player::Protocols::HTTP';
 
 sub canSeek { 1 }
 
 sub _makeMetadata {
   	my ($json) = shift;
   	my $stream = addClientId($json->{'stream_url'});
-	#  $stream =~ s/https/http/;
+	$stream =~ s/https/http/;
   	my $DATA = {
     		duration => int($json->{'duration'} / 1000),
     		name => $json->{'title'},
@@ -139,7 +139,7 @@ sub gotNextTrack {
   	$song->pluginData( $track );
 
   	my $stream = addClientId($track->{'stream_url'});
-  	#$stream =~ s/https/http/;
+  	$stream =~ s/https/http/;
   	$log->info($stream);
   	$song->streamUrl($stream);
 

@@ -135,7 +135,7 @@ sub fetchMetadata {
 sub _makeMetadata {
   	my ($json) = shift;
   	my $stream = addClientId($json->{'stream_url'});
-  	#$stream =~ s/https/http/;
+  	$stream =~ s/https/http/;
   	my $DATA = {
     		#duration => $json->{'duration'} / 1000,
     		name => $json->{'title'},
