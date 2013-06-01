@@ -6,8 +6,8 @@
 <plugin name="SqueezeCloud" version="0.8.2" minTarget="7.5" maxTarget="*">
 <title lang="EN">SqueezeCloud</title>
 <desc lang="EN">Browse, search and play urls from soundcloud</desc>
-<url>http://192.168.100.2/squeezecloud/SqueezeCloud.zip</url>
-<link>https://github.com/blackmad/squeezecloud</link>
+<url>http://grobbie.github.io/SqueezeCloud/SqueezeCloud.zip</url>
+<link>https://github.com/grobbie/SqueezeCloud</link>
 <sha>5783444f2b0bf187c9d56dabad54e6052405747a</sha>
 <creator>Robert Gibbon, David Blackman</creator>
 <email>robSPAMMENOTgibbon@me.com</email>
