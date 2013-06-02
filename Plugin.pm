@@ -513,7 +513,7 @@ sub _parseActivities {
 
     		if ($type =~ /playlist.*/) {
       			my $playlistItem = _parsePlaylist($origin);
-      			my $user = $playlist->{'user'};
+      			my $user = $origin->{'user'};
       			my $user_name = $user->{'full_name'} || $user->{'username'};
 
       			$playlistItem->{'name'} = $playlistItem->{'name'} . " shared by " . $user_name;
