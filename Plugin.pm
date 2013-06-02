@@ -520,7 +520,7 @@ sub _parseActivities {
       			push @$menu, $playlistItem;
     		} else {
       			my $track = $origin->{'track'} || $origin;
-      			my $user = $origin->{'user'};
+      			my $user = $origin->{'user'} || $track->{'user'};
       			my $user_name = $user->{'full_name'} || $user->{'username'};
 			$track->{'artist_sqz'} = $user_name;
 
