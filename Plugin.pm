@@ -232,9 +232,9 @@ sub tracksHandler {
 	$fetch = sub {
     		# in case we've already fetched some of this page, keep going
 		my $i = $index + scalar @$menu;
-    		$log->warn("i: " + $i);
+    		$log->warn("i: " . $i);
 		my $max = min($quantity - scalar @$menu, 200); # api allows max of 200 items per response
-    		$log->warn("max: " + $max);
+    		$log->warn("max: " . $max);
     
     		my $method = "https";
     		my $uid = $passDict->{'uid'} || '';
@@ -538,7 +538,7 @@ sub _parseActivities {
       			my $trackentry = _makeMetadata($track);
       			$trackentry->{'name'} = $track->{'title'} . " " . $subtitle;
       
-      			push @$menu, %$trackentry;
+      			push @$menu, $trackentry;
     		}
   	}
 }
