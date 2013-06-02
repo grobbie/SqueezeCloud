@@ -147,7 +147,7 @@ sub _makeMetadata {
     		#duration => $json->{'duration'} / 1000,
     		name => $json->{'title'},
     		title => $json->{'title'},
-    		artist = $json->{'user'}->{'username'} || "",
+    		artist = $json->{'user'}->{'username'},
     		#play => $stream,
     		play => "soundcloud://" . $json->{'id'},
     		#url  => $json->{'permalink_url'},
