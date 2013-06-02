@@ -30,6 +30,24 @@ use base 'Slim::Player::Protocols::HTTP';
 
 sub canSeek { 1 }
 
+sub addClientId {
+	my ($url) = shift;
+
+	my $prefix = "?";
+
+	if ($url =~ /\?/) {
+		my $prefix = "&";		
+	}
+	
+	my $decorated = $url . $prefix . "client_id=$CLIENT_ID";
+
+    	if (0 && $prefs->get('apiKey')) {
+		my $decorated = $url . $prefix . "oauth_token=" . $prefs->get('apiKey');
+      		$log->info($decorated);
+    	}
+	return $decorated;
+}
+
 sub _makeMetadata {
   	my ($json) = shift;
   	my $stream = addClientId($json->{'stream_url'});
@@ -55,24 +73,6 @@ sub _makeMetadata {
 my $CLIENT_ID = "ff21e0d51f1ea3baf9607a1d072c564f";
 my $prefs = preferences('plugin.squeezecloud');
 
-sub addClientId {
-	my ($url) = shift;
-
-	my $prefix = "?";
-
-	if ($url =~ /\?/) {
-		my $prefix = "&";		
-	}
-	
-	my $decorated = $url . $prefix . "client_id=$CLIENT_ID";
-
-    	if (0 && $prefs->get('apiKey')) {
-		my $decorated = $url . $prefix . "oauth_token=" . $prefs->get('apiKey');
-      		$log->info($decorated);
-    	}
-	return $decorated;
-}
-
 sub getFormatForURL () { 'mp3' }
 
 sub isRemote { 1 }
@@ -80,35 +80,6 @@ sub isRemote { 1 }
 sub scanUrl {
   	my ($class, $url, $args) = @_;
   	$args->{cb}->( $args->{song}->currentTrack() );
-}
-
-sub getNextTrack {
-	my ($class, $song, $successCb, $errorCb) = @_;
-	  
-	my $client = $song->master();
-	my $url    = $song->currentTrack()->url;
-	  
-	# Get next track
-	my ($id) = $url =~ m{^soundcloud://(.*)$};
-	  
-	# Talk to SN and get the next track to play
-	my $trackURL = addClientId("http://api.soundcloud.com/tracks/" . $id . ".json");
-	  
-	my $http = Slim::Networking::SimpleAsyncHTTP->new(
-	          \&gotNextTrack,
-	          \&gotNextTrackError,
-	          {
-	                  client        => $client,
-	                  song          => $song,
-	                  callback      => $successCb,
-	                  errorCallback => $errorCb,
-	                  timeout       => 35,
-	          },
-	);
-	  
-	main::DEBUGLOG && $log->is_debug && $log->debug("Getting track from soundcloud for $id");
-	  
-	$http->get( $trackURL );
 }
 
 sub gotNextTrack {
@@ -166,6 +137,35 @@ sub gotNextTrackError {
   	my $http = shift;
   
   	$http->params->{errorCallback}->( 'PLUGIN_SQUEEZECLOUD_ERROR', $http->error );
+}
+
+sub getNextTrack {
+	my ($class, $song, $successCb, $errorCb) = @_;
+	  
+	my $client = $song->master();
+	my $url    = $song->currentTrack()->url;
+	  
+	# Get next track
+	my ($id) = $url =~ m{^soundcloud://(.*)$};
+	  
+	# Talk to SN and get the next track to play
+	my $trackURL = addClientId("http://api.soundcloud.com/tracks/" . $id . ".json");
+	  
+	my $http = Slim::Networking::SimpleAsyncHTTP->new(
+	          \&gotNextTrack,
+	          \&gotNextTrackError,
+	          {
+	                  client        => $client,
+	                  song          => $song,
+	                  callback      => $successCb,
+	                  errorCallback => $errorCb,
+	                  timeout       => 35,
+	          },
+	);
+	  
+	main::DEBUGLOG && $log->is_debug && $log->debug("Getting track from soundcloud for $id");
+	  
+	$http->get( $trackURL );
 }
 
 # To support remote streaming (synced players, slimp3/SB1), we need to subclass Protocols::HTTP

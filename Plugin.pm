@@ -55,32 +55,6 @@ my $prefs = preferences('plugin.squeezecloud');
 
 $prefs->init({ apiKey => "" });
 
-sub initPlugin {
-	my $class = shift;
-
-	$class->SUPER::initPlugin(
-		feed   => \&toplevel,
-		tag    => 'squeezecloud',
-		menu   => 'radios',
-		is_app => $class->can('nonSNApps') ? 1 : undef,
-		weight => 10,
-	);
-
-	if (!$::noweb) {
-		require Plugins::SqueezeCloud::Settings;
-		Plugins::SqueezeCloud::Settings->new;
-	}
-
-  	Slim::Formats::RemoteMetadata->registerProvider(
-    		match => qr/soundcloud\.com/,
-    		func => \&metadata_provider,
-  	);
-
-  	Slim::Player::ProtocolHandlers->registerHandler(
-    		soundcloud => 'Plugins::SqueezeCloud::ProtocolHandler'
-  	);
-}
-
 sub defaultMeta {
 	my ( $client, $url ) = @_;
 	
@@ -89,48 +63,22 @@ sub defaultMeta {
 	};
 }
 
-# TODO: make this async
-sub metadata_provider {
-  	my ( $client, $url ) = @_;
-  	
-	if (exists $METADATA_CACHE{$url}) {
-    		return $METADATA_CACHE{$url};
-  	}
-	
-	if ($url =~ /ak-media.soundcloud.com\/(.*\.mp3)/) {
-    		return $METADATA_CACHE{$1};
-  	} 
-	
-	if ( !$client->master->pluginData('webapifetchingMeta') ) {
-		# Fetch metadata in the background
-		Slim::Utils::Timers::killTimers( $client, \&fetchMetadata );
-    		$client->master->pluginData( webapifetchingMeta => 1 );
-		fetchMetadata( $client, $url );
-	}
-	
-	return defaultMeta( $client, $url );
-}
+sub addClientId {
+        my ($url) = shift;
 
-sub fetchMetadata {
-  	my ( $client, $url ) = @_;
- 
-  	if ($url =~ /tracks\/\d+\/stream/) {
+        my $prefix = "?";
 
-    		my $queryUrl = $url;
-    		$queryUrl =~ s/\/stream/.json/;
+        if ($url =~ /\?/) {
+                my $prefix = "&";
+        }
 
-    		my $http = Slim::Networking::SimpleAsyncHTTP->new(
-      			\&_gotMetadata,
-      			\&_gotMetadataError,
-      			{
-        			client     => $client,
-        			url        => $url,
-        			timeout    => 30,
-      			},
-    		);
+        my $decorated = $url . $prefix . "client_id=$CLIENT_ID";
 
-    		$http->get($queryUrl);
-  	}
+        if (0 && $prefs->get('apiKey')) {
+                my $decorated = $url . $prefix . "oauth_token=" . $prefs->get('apiKey');
+                $log->info($decorated);
+        }
+        return $decorated;
 }
 
 sub _makeMetadata {
@@ -167,6 +115,23 @@ sub _makeMetadata {
   	return \%DATA3;
 }
 
+sub _gotMetadataError {
+	my $http   = shift;
+	my $client = $http->params('client');
+	my $url    = $http->params('url');
+	my $error  = $http->error;
+	
+	$log->is_debug && $log->debug( "Error fetching Web API metadata: $error" );
+	
+	$client->master->pluginData( webapifetchingMeta => 0 );
+	
+	# To avoid flooding the SOUNDCLOUD servers in the case of errors, we just ignore further
+	# metadata for this track if we get an error
+	my $meta = defaultMeta( $client, $url );
+	$meta->{_url} = $url;
+	
+	$client->master->pluginData( webapimetadata => $meta );
+}
 
 sub _gotMetadata {
 	my $http      = shift;
@@ -207,115 +172,37 @@ sub _gotMetadata {
   	return;
 }
 
-sub _gotMetadataError {
-	my $http   = shift;
-	my $client = $http->params('client');
-	my $url    = $http->params('url');
-	my $error  = $http->error;
-	
-	$log->is_debug && $log->debug( "Error fetching Web API metadata: $error" );
-	
-	$client->master->pluginData( webapifetchingMeta => 0 );
-	
-	# To avoid flooding the SOUNDCLOUD servers in the case of errors, we just ignore further
-	# metadata for this track if we get an error
-	my $meta = defaultMeta( $client, $url );
-	$meta->{_url} = $url;
-	
-	$client->master->pluginData( webapimetadata => $meta );
-}
+sub fetchMetadata {
+  	my ( $client, $url ) = @_;
+ 
+  	if ($url =~ /tracks\/\d+\/stream/) {
 
+    		my $queryUrl = $url;
+    		$queryUrl =~ s/\/stream/.json/;
 
-sub shutdownPlugin {
-	my $class = shift;
-}
-
-sub getDisplayName { 'PLUGIN_SQUEEZECLOUD' }
-
-sub playerMenu { shift->can('nonSNApps') ? undef : 'RADIO' }
-
-sub toplevel {
-	my ($client, $callback, $args) = @_;
-
-  	my $callbacks = [
-		{ name => string('PLUGIN_SQUEEZECLOUD_HOT'), type => 'link',   
-		  url  => \&tracksHandler, passthrough => [ { params => 'order=hotness' } ], },
-
-    		{ name => string('PLUGIN_SQUEEZECLOUD_NEW'), type => 'link',   
-		  url  => \&tracksHandler, passthrough => [ { params => 'order=created_at' } ], },
-
-    		{ name => string('PLUGIN_SQUEEZECLOUD_SEARCH'), type => 'search',   
-		  url  => \&tracksHandler, passthrough => [ { params => 'order=hotness' } ], },
-
-    		{ name => string('PLUGIN_SQUEEZECLOUD_TAGS'), type => 'search',   
-		  url  => \&tracksHandler, passthrough => [ { type => 'tags', params => 'order=hotness' } ], },
-
-		# new playlists change too quickly for this to work reliably, the way xmlbrowser needs to replay the requests
-		# from the top.
-		#    { name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_BROWSE'), type => 'link',
-		#		  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
-
-		{ name => string('PLUGIN_SQUEEZECLOUD_PLAYLIST_SEARCH'), type => 'search',
-   	  	url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
-	];
-
-  	if ($prefs->get('apiKey') ne '') {
-    		push(@$callbacks, 
-      			{ name => string('PLUGIN_SQUEEZECLOUD_ACTIVITIES'), type => 'link',
-		    	url  => \&tracksHandler, passthrough => [ { type => 'activities', parser => \&_parseActivities} ] }
+    		my $http = Slim::Networking::SimpleAsyncHTTP->new(
+      			\&_gotMetadata,
+      			\&_gotMetadataError,
+      			{
+        			client     => $client,
+        			url        => $url,
+        			timeout    => 30,
+      			},
     		);
 
-    		push(@$callbacks, 
-      			{ name => string('PLUGIN_SQUEEZECLOUD_FAVORITES'), type => 'link',
-		    	url  => \&tracksHandler, passthrough => [ { type => 'favorites' } ] }
-    		);
-    		push(@$callbacks, 
-      			{ name => string('PLUGIN_SQUEEZECLOUD_FRIENDS'), type => 'link',
-		  	url  => \&tracksHandler, passthrough => [ { type => 'friends', parser => \&_parseFriends} ] },
-    		);
+    		$http->get($queryUrl);
   	}
-
-  	push(@$callbacks, 
-		{ name => string('PLUGIN_SQUEEZECLOUD_URL'), type => 'search', url  => \&urlHandler, }
-  	);
-
-	$callback->($callbacks);
 }
 
-sub urlHandler {
-	my ($client, $callback, $args) = @_;
+sub _parseTracks {
+	$log->info("parsing tracks");
+	my ($json, $menu) = @_;
 
-	my $url = $args->{'search'};
-	# awful hacks, why are periods being replaced?
-  	$url =~ s/ com/.com/;
-  	$url =~ s/www /www./;
-
-  	# TODO: url escape this
-  	my $queryUrl = "http://api.soundcloud.com/resolve.json?url=$url&client_id=$CLIENT_ID";
-  	#$log->warn($queryUrl);
-
-  	my $fetch = sub {
-		Slim::Networking::SimpleAsyncHTTP->new(
-			sub {
-				my $http = shift;
-				my $json = eval { from_json($http->content) };
-
-        			if (exists $json->{'tracks'}) {
-          				$callback->({ items => [ _parsePlaylist($json) ] });
-        			} else {
-          				$callback->({
-            				items => [ _makeMetadata($json) ]
-          				});
-        			}
-			},
-			sub {
-				$log->warn("error: $_[1]");
-				$callback->([ { name => $_[1], type => 'text' } ]);
-			},
-		)->get($queryUrl);
-	};
-		
-	$fetch->();
+  	for my $entry (@$json) {
+    		if ($entry->{'streamable'}) {
+      			push @$menu, _makeMetadata($entry);
+    		}
+  	}
 }
 
 sub tracksHandler {
@@ -446,33 +333,61 @@ sub tracksHandler {
 	$fetch->();
 }
 
-sub addClientId {
-        my ($url) = shift;
-
-        my $prefix = "?";
-
-        if ($url =~ /\?/) {
-                my $prefix = "&";
-        }
-
-        my $decorated = $url . $prefix . "client_id=$CLIENT_ID";
-
-        if (0 && $prefs->get('apiKey')) {
-                my $decorated = $url . $prefix . "oauth_token=" . $prefs->get('apiKey');
-                $log->info($decorated);
-        }
-        return $decorated;
+# TODO: make this async
+sub metadata_provider {
+  	my ( $client, $url ) = @_;
+  	
+	if (exists $METADATA_CACHE{$url}) {
+    		return $METADATA_CACHE{$url};
+  	}
+	
+	if ($url =~ /ak-media.soundcloud.com\/(.*\.mp3)/) {
+    		return $METADATA_CACHE{$1};
+  	} 
+	
+	if ( !$client->master->pluginData('webapifetchingMeta') ) {
+		# Fetch metadata in the background
+		Slim::Utils::Timers::killTimers( $client, \&fetchMetadata );
+    		$client->master->pluginData( webapifetchingMeta => 1 );
+		fetchMetadata( $client, $url );
+	}
+	
+	return defaultMeta( $client, $url );
 }
 
-sub _parseTracks {
-	$log->info("parsing tracks");
-	my ($json, $menu) = @_;
+sub urlHandler {
+	my ($client, $callback, $args) = @_;
 
-  	for my $entry (@$json) {
-    		if ($entry->{'streamable'}) {
-      			push @$menu, _makeMetadata($entry);
-    		}
-  	}
+	my $url = $args->{'search'};
+	# awful hacks, why are periods being replaced?
+  	$url =~ s/ com/.com/;
+  	$url =~ s/www /www./;
+
+  	# TODO: url escape this
+  	my $queryUrl = "http://api.soundcloud.com/resolve.json?url=$url&client_id=$CLIENT_ID";
+
+  	my $fetch = sub {
+		Slim::Networking::SimpleAsyncHTTP->new(
+			sub {
+				my $http = shift;
+				my $json = eval { from_json($http->content) };
+
+        			if (exists $json->{'tracks'}) {
+          				$callback->({ items => [ _parsePlaylist($json) ] });
+        			} else {
+          				$callback->({
+            				items => [ _makeMetadata($json) ]
+          				});
+        			}
+			},
+			sub {
+				$log->warn("error: $_[1]");
+				$callback->([ { name => $_[1], type => 'text' } ]);
+			},
+		)->get($queryUrl);
+	};
+		
+	$fetch->();
 }
 
 sub _parsePlaylistTracks {
@@ -520,6 +435,69 @@ sub _parsePlaylists {
   	}
 }
 
+sub _parseFriend {
+	my ($entry, $menu) = @_;
+
+  	my $image = $entry->{'avatar_url'};
+  	my $name = $entry->{'full_name'} || $entry->{'username'};
+  	my $favorite_count = $entry->{'public_favorites_count'};
+  	my $track_count = $entry->{'track_count'};
+  	my $playlist_count = $entry->{'playlist_count'};
+  	my $id = $entry->{'id'};
+
+  	push @$menu, {
+    		name => sprintf("%d Favorites", $favorite_count),
+    		icon => $image,
+    		image => $image,
+    		type => 'playlist',
+    		url => \&tracksHandler,
+    		passthrough => [ { type => 'favorites', uid => $id, max => $favorite_count }],
+  	};
+
+  	push @$menu, {
+    		name => sprintf("%d Tracks", $favorite_count),
+    		icon => $image,
+    		image => $image,
+    		type => 'playlist',
+    		url => \&tracksHandler,
+    		passthrough => [ { type => 'tracks', uid => $id, max => $track_count }],
+  	};
+
+  	push @$menu, {
+    		name => sprintf("%d Playlists", $playlist_count),
+    		icon => $image,
+    		image => $image,
+    		type => 'link',
+    		url => \&tracksHandler,
+    		passthrough => [ { type => 'playlists', uid => $id, max => $playlist_count,
+      		parser => \&_parsePlaylists } ]
+  	};
+}
+
+sub _parseFriends {
+	my ($json, $menu) = @_;
+  	my $i = 0;
+
+  	for my $entry (@$json) {
+    		my $image = $entry->{'avatar_url'};
+    		my $name = $entry->{'full_name'} || $entry->{'username'};
+    		my $favorite_count = $entry->{'public_favorites_count'};
+    		my $track_count = $entry->{'track_count'};
+    		my $playlist_count = $entry->{'playlist_count'};
+    		my $id = $entry->{'id'};
+
+    		push @$menu, {
+      			name => sprintf("%s (%d favorites, %d tracks, %d sets)",
+        		$name, $favorite_count, $track_count, $playlist_count),
+      			icon => $image,
+      			image => $image,
+      			type => 'link',
+      			url => \&tracksHandler,
+      			passthrough => [ { type => 'friend', uid => $id, parser => \&_parseFriend} ]
+    		};
+  	}
+}
+
 sub _parseActivities {
 	my ($json, $menu) = @_;
   	my $collection = $json->{'collection'};
@@ -563,67 +541,86 @@ sub _parseActivities {
   	}
 }
 
-sub _parseFriends {
-	my ($json, $menu) = @_;
-  	my $i = 0;
+sub initPlugin {
+	my $class = shift;
 
-  	for my $entry (@$json) {
-    		my $image = $entry->{'avatar_url'};
-    		my $name = $entry->{'full_name'} || $entry->{'username'};
-    		my $favorite_count = $entry->{'public_favorites_count'};
-    		my $track_count = $entry->{'track_count'};
-    		my $playlist_count = $entry->{'playlist_count'};
-    		my $id = $entry->{'id'};
+	$class->SUPER::initPlugin(
+		feed   => \&toplevel,
+		tag    => 'squeezecloud',
+		menu   => 'radios',
+		is_app => $class->can('nonSNApps') ? 1 : undef,
+		weight => 10,
+	);
 
-    		push @$menu, {
-      			name => sprintf("%s (%d favorites, %d tracks, %d sets)",
-        		$name, $favorite_count, $track_count, $playlist_count),
-      			icon => $image,
-      			image => $image,
-      			type => 'link',
-      			url => \&tracksHandler,
-      			passthrough => [ { type => 'friend', uid => $id, parser => \&_parseFriend} ]
-    		};
-  	}
+	if (!$::noweb) {
+		require Plugins::SqueezeCloud::Settings;
+		Plugins::SqueezeCloud::Settings->new;
+	}
+
+  	Slim::Formats::RemoteMetadata->registerProvider(
+    		match => qr/soundcloud\.com/,
+    		func => \&metadata_provider,
+  	);
+
+  	Slim::Player::ProtocolHandlers->registerHandler(
+    		soundcloud => 'Plugins::SqueezeCloud::ProtocolHandler'
+  	);
 }
 
-sub _parseFriend {
-	my ($entry, $menu) = @_;
+sub shutdownPlugin {
+	my $class = shift;
+}
 
-  	my $image = $entry->{'avatar_url'};
-  	my $name = $entry->{'full_name'} || $entry->{'username'};
-  	my $favorite_count = $entry->{'public_favorites_count'};
-  	my $track_count = $entry->{'track_count'};
-  	my $playlist_count = $entry->{'playlist_count'};
-  	my $id = $entry->{'id'};
+sub getDisplayName { 'PLUGIN_SQUEEZECLOUD' }
 
-  	push @$menu, {
-    		name => sprintf("%d Favorites", $favorite_count),
-    		icon => $image,
-    		image => $image,
-    		type => 'playlist',
-    		url => \&tracksHandler,
-    		passthrough => [ { type => 'favorites', uid => $id, max => $favorite_count }],
-  	};
+sub playerMenu { shift->can('nonSNApps') ? undef : 'RADIO' }
 
-  	push @$menu, {
-    		name => sprintf("%d Tracks", $favorite_count),
-    		icon => $image,
-    		image => $image,
-    		type => 'playlist',
-    		url => \&tracksHandler,
-    		passthrough => [ { type => 'tracks', uid => $id, max => $track_count }],
-  	};
+sub toplevel {
+	my ($client, $callback, $args) = @_;
 
-  	push @$menu, {
-    		name => sprintf("%d Playlists", $playlist_count),
-    		icon => $image,
-    		image => $image,
-    		type => 'link',
-    		url => \&tracksHandler,
-    		passthrough => [ { type => 'playlists', uid => $id, max => $playlist_count,
-      		parser => \&_parsePlaylists } ]
-  	};
+  	my $callbacks = [
+		{ name => string('PLUGIN_SQUEEZECLOUD_HOT'), type => 'link',   
+		  url  => \&tracksHandler, passthrough => [ { params => 'order=hotness' } ], },
+
+    		{ name => string('PLUGIN_SQUEEZECLOUD_NEW'), type => 'link',   
+		  url  => \&tracksHandler, passthrough => [ { params => 'order=created_at' } ], },
+
+    		{ name => string('PLUGIN_SQUEEZECLOUD_SEARCH'), type => 'search',   
+		  url  => \&tracksHandler, passthrough => [ { params => 'order=hotness' } ], },
+
+    		{ name => string('PLUGIN_SQUEEZECLOUD_TAGS'), type => 'search',   
+		  url  => \&tracksHandler, passthrough => [ { type => 'tags', params => 'order=hotness' } ], },
+
+		# new playlists change too quickly for this to work reliably, the way xmlbrowser needs to replay the requests
+		# from the top.
+		#    { name => string('PLUGIN_SOUNDCLOUD_PLAYLIST_BROWSE'), type => 'link',
+		#		  url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
+
+		{ name => string('PLUGIN_SQUEEZECLOUD_PLAYLIST_SEARCH'), type => 'search',
+   	  	url  => \&tracksHandler, passthrough => [ { type => 'playlists', parser => \&_parsePlaylists } ] },
+	];
+
+  	if ($prefs->get('apiKey') ne '') {
+    		push(@$callbacks, 
+      			{ name => string('PLUGIN_SQUEEZECLOUD_ACTIVITIES'), type => 'link',
+		    	url  => \&tracksHandler, passthrough => [ { type => 'activities', parser => \&_parseActivities} ] }
+    		);
+
+    		push(@$callbacks, 
+      			{ name => string('PLUGIN_SQUEEZECLOUD_FAVORITES'), type => 'link',
+		    	url  => \&tracksHandler, passthrough => [ { type => 'favorites' } ] }
+    		);
+    		push(@$callbacks, 
+      			{ name => string('PLUGIN_SQUEEZECLOUD_FRIENDS'), type => 'link',
+		  	url  => \&tracksHandler, passthrough => [ { type => 'friends', parser => \&_parseFriends} ] },
+    		);
+  	}
+
+  	push(@$callbacks, 
+		{ name => string('PLUGIN_SQUEEZECLOUD_URL'), type => 'search', url  => \&urlHandler, }
+  	);
+
+	$callback->($callbacks);
 }
 
 1;
