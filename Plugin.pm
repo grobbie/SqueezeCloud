@@ -398,7 +398,7 @@ sub _parsePlaylistTracks {
 
 sub _parsePlaylist {
 	my ($entry) = @_;
-	#$log->info(Dumper($entry));
+
 	my $title = $entry->{'title'};
   	$log->info($title);
   	my $numTracks = 0;
@@ -418,12 +418,14 @@ sub _parsePlaylist {
     		$titleInfo .= "${minutes}m${seconds}s";
   	}
 
-  	$title .= " ($titleInfo)";
-  	$log->info($title);
+	my $icon = $entry->{'artwork_url'} || "";
+
+  	$title .= " ($titleInfo)";	
 
   	return {
     		name => $title,
     		type => 'playlist',
+		icon => $icon,
     		url => \&tracksHandler,
     		passthrough => [ { type => 'playlists', pid => $entry->{'id'}, parser => \&_parsePlaylistTracks }],
   	};
@@ -510,9 +512,7 @@ sub _parseActivities {
     		my $type = $entry->{'type'};
 
     		if ($type =~ /playlist.*/) {
-      			my $playlist = $origin->{'playlist'};
-      			my $playlistItem = _parsePlaylist($playlist);
-      
+      			my $playlistItem = _parsePlaylist($origin);
       			my $user = $playlist->{'user'};
       			my $user_name = $user->{'full_name'} || $user->{'username'};
 
