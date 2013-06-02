@@ -82,7 +82,8 @@ sub addClientId {
 }
 
 sub _makeMetadata {
-  	my ($json) = shift;
+	my ($json) = shift;
+
   	my $stream = addClientId($json->{'stream_url'});
   	$stream =~ s/https/http/;
 
@@ -95,8 +96,7 @@ sub _makeMetadata {
     		#duration => $json->{'duration'} / 1000,
     		name => $json->{'title'},
     		title => $json->{'title'},
-    		artist => $json->{'user'}->{'username'} || "",
-    		#play => $stream,
+    		artist => $json->{'user'}->{'username'} || $json->{'artist_sqz'},
     		play => "soundcloud://" . $json->{'id'},
     		#url  => $json->{'permalink_url'},
     		#link => "soundcloud://" . $json->{'id'},
@@ -149,6 +149,7 @@ sub _gotMetadata {
 	$client->master->pluginData( webapifetchingMeta => 0 );
     
   	my $json = eval { from_json($content) };
+	my $user_name = $json->{'user'}->{'username'};
 
   	my $DATA = _makeMetadata($json);
 
@@ -518,14 +519,15 @@ sub _parseActivities {
       			$playlistItem->{'name'} = $playlistItem->{'name'} . " shared by " . $user_name;
       			push @$menu, $playlistItem;
     		} else {
-      			my $track = $origin->{'track'};
+      			my $track = $origin->{'track'} || $origin;
       			my $user = $origin->{'user'};
       			my $user_name = $user->{'full_name'} || $user->{'username'};
+			$track->{'artist_sqz'} = $user_name;
 
       			my $subtitle = "";
-      			if ($type == "favoriting") {
+      			if ($type eq "favoriting") {
         			$subtitle = "favorited by $user_name";
-      			} elsif ($type == "comment") {
+      			} elsif ($type eq "comment") {
         			$subtitle = "commented on by $user_name";
       			} elsif ($type =~ /track/) {
         			$subtitle = "new track by $user_name";
