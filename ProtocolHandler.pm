@@ -28,6 +28,9 @@ Slim::Player::ProtocolHandlers->registerHandler('soundcloud', __PACKAGE__);
 use strict;
 use base 'Slim::Player::Protocols::HTTP';
 
+my $CLIENT_ID = "ff21e0d51f1ea3baf9607a1d072c564f";
+my $prefs = preferences('plugin.squeezecloud');
+
 sub canSeek { 1 }
 
 sub addClientId {
@@ -69,9 +72,6 @@ sub _makeMetadata {
     		cover => $json->{'artwork_url'} || "",
   	};
 }
-
-my $CLIENT_ID = "ff21e0d51f1ea3baf9607a1d072c564f";
-my $prefs = preferences('plugin.squeezecloud');
 
 sub getFormatForURL () { 'mp3' }
 
